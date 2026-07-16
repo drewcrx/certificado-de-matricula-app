@@ -1,0 +1,160 @@
+<ion-header [translucent]="true">
+  <ion-toolbar color="primary">
+    <ion-title>
+      <div class="header-bot">
+        <div class="avatar-bot">
+          <img src="assets/icon/logo-yavirac.png" alt="Logo Yavirac" />
+        </div>
+        <div class="header-textos">
+          <span class="nombre-bot">Yavirac</span>
+          <span class="subtitulo-bot">Asistente virtual académico</span>
+        </div>
+      </div>
+    </ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="chat-content">
+  <div class="chat-lista">
+    <ng-container *ngFor="let m of mensajes">
+
+      <div class="fila fila-bot" *ngIf="m.tipo === 'bot-texto'">
+        <div class="avatar-mini">
+          <img src="assets/icon/logo-yavirac.png" alt="Yavirac" />
+        </div>
+        <div class="burbuja burbuja-bot">{{ m.texto }}</div>
+      </div>
+
+      <div class="fila fila-bot" *ngIf="m.tipo === 'bot-escribiendo'">
+        <div class="avatar-mini">
+          <img src="assets/icon/logo-yavirac.png" alt="Yavirac" />
+        </div>
+        <div class="burbuja burbuja-bot burbuja-escribiendo">
+          <span class="punto"></span><span class="punto"></span><span class="punto"></span>
+        </div>
+      </div>
+
+      <div class="fila fila-usuario" *ngIf="m.tipo === 'usuario-texto'">
+        <div class="burbuja burbuja-usuario">{{ m.texto }}</div>
+      </div>
+
+      <div class="fila fila-bot" *ngIf="m.tipo === 'bot-opciones'">
+        <div class="avatar-mini">
+          <img src="assets/icon/logo-yavirac.png" alt="Yavirac" />
+        </div>
+        <div class="tarjeta tarjeta-opciones">
+          <ion-chip
+            *ngFor="let op of opcionesMenu"
+            [class.deshabilitado]="!op.disponible"
+            (click)="seleccionarOpcion(op)">
+            <ion-icon [name]="op.icono"></ion-icon>
+            <ion-label>{{ op.etiqueta }}</ion-label>
+          </ion-chip>
+        </div>
+      </div>
+
+      <div class="fila fila-bot" *ngIf="m.tipo === 'bot-preview-certificado'">
+        <div class="avatar-mini">
+          <img src="assets/icon/logo-yavirac.png" alt="Yavirac" />
+        </div>
+        <div class="tarjeta tarjeta-preview">
+          <h3>Certificado de matrícula</h3>
+          <ul>
+            <li><strong>Nombre:</strong> {{ m.estudiante?.nombres }} {{ m.estudiante?.apellidos }}</li>
+            <li><strong>Cédula:</strong> {{ m.estudiante?.cedula }}</li>
+            <li><strong>Carrera:</strong> {{ m.estudiante?.carrera }}</li>
+            <li><strong>Nivel:</strong> {{ m.estudiante?.nivel }}</li>
+            <li><strong>Periodo:</strong> {{ m.estudiante?.periodoActual }}</li>
+          </ul>
+          <ion-button
+            expand="block"
+            color="secondary"
+            (click)="generarCertificado()"
+            [disabled]="estado === 'generando_certificado'">
+            <ion-icon slot="start" name="qr-code-outline"></ion-icon>
+            Generar certificado de matrícula
+          </ion-button>
+        </div>
+      </div>
+
+      <div class="fila fila-bot" *ngIf="m.tipo === 'bot-resultado-certificado'">
+        <div class="avatar-mini">
+          <img src="assets/icon/logo-yavirac.png" alt="Yavirac" />
+        </div>
+        <div class="tarjeta tarjeta-certificado">
+          <div class="encabezado-certificado">
+            <ion-icon name="ribbon-outline"></ion-icon>
+            <span>CERTIFICADO DE MATRÍCULA</span>
+          </div>
+          <p class="nombre-certificado">{{ m.certificado?.nombreCompleto }}</p>
+          <ul>
+            <li><strong>Cédula:</strong> {{ m.certificado?.cedula }}</li>
+            <li><strong>Carrera:</strong> {{ m.certificado?.carrera }}</li>
+            <li><strong>Nivel:</strong> {{ m.certificado?.nivel }}</li>
+            <li><strong>Periodo:</strong> {{ m.certificado?.periodoActual }}</li>
+            <li><strong>Fecha de emisión:</strong> {{ m.certificado?.fechaEmision }}</li>
+          </ul>
+          <div class="zona-qr">
+            <img [src]="m.qrDataUrl" alt="Código QR único del certificado" />
+            <span class="codigo-qr">{{ m.certificado?.codigoUnico }}</span>
+          </div>
+          <ion-button expand="block" fill="outline" size="small" (click)="compartirCertificado(m)">
+            <ion-icon slot="start" name="share-outline"></ion-icon>
+            Compartir / Descargar
+          </ion-button>
+        </div>
+      </div>
+
+    </ng-container>
+  </div>
+</ion-content>
+
+<ion-footer>
+  <ion-toolbar *ngIf="estado === 'esperando_cedula' || estado === 'consultando'">
+    <ion-item lines="none" class="input-cedula">
+      <ion-input
+        placeholder="Ingresa tu número de cédula"
+        inputmode="numeric"
+        maxlength="10"
+        [(ngModel)]="cedulaIngresada"
+        [disabled]="estado === 'consultando'"
+        (keyup.enter)="enviarCedula()">
+      </ion-input>
+      <ion-button slot="end" fill="clear" [disabled]="!puedeEnviarCedula" (click)="enviarCedula()">
+        <ion-icon slot="icon-only" name="send-outline"></ion-icon>
+      </ion-button>
+    </ion-item>
+    <p class="error-cedula" *ngIf="errorCedula">{{ errorCedula }}</p>
+  </ion-toolbar>
+
+  <ion-toolbar *ngIf="estado === 'esperando_ticket' || estado === 'validando_ticket'">
+    <ion-item lines="none" class="input-cedula">
+      <ion-input
+        placeholder="Ticket de verificación"
+        inputmode="numeric"
+        maxlength="6"
+        [(ngModel)]="ticketIngresado"
+        [disabled]="estado === 'validando_ticket'"
+        (keyup.enter)="verificarTicketIngresado()">
+      </ion-input>
+      <ion-button slot="end" fill="clear" [disabled]="!puedeVerificarTicket" (click)="verificarTicketIngresado()">
+        <ion-icon slot="icon-only" name="send-outline"></ion-icon>
+      </ion-button>
+    </ion-item>
+    <p class="error-cedula" *ngIf="errorTicket">{{ errorTicket }}</p>
+  </ion-toolbar>
+
+  <ion-toolbar *ngIf="estado === 'menu' || estado === 'preview_certificado'">
+    <ion-button fill="clear" size="small" (click)="volverAlMenu()" *ngIf="estado === 'preview_certificado'">
+      <ion-icon slot="start" name="arrow-back-outline"></ion-icon>
+      Volver al menú
+    </ion-button>
+  </ion-toolbar>
+
+  <ion-toolbar *ngIf="estado === 'resultado'">
+    <ion-button expand="block" fill="outline" (click)="nuevaConsulta()">
+      <ion-icon slot="start" name="refresh-outline"></ion-icon>
+      Nueva consulta
+    </ion-button>
+  </ion-toolbar>
+</ion-footer>

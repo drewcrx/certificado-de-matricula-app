@@ -1,0 +1,186 @@
+{
+  "name": "App Matrícula - Verificar Ticket",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Verificar ticket\n- Busca un ticket para esa cédula que NO esté usado, NO haya expirado y coincida exactamente.\n- Si existe, lo marca como usado (para que no se pueda reutilizar) y responde valido:true.\n- Si no existe/expiró/no coincide, responde valido:false.\n- Ajusta el nodo Postgres al motor real de base de datos.",
+        "height": 220,
+        "width": 340
+      },
+      "id": "d1111111-1111-4111-8111-111111111111",
+      "name": "Nota",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-220, -40]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "verificar-ticket",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "d2222222-2222-4222-8222-222222222222",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 0],
+      "webhookId": "verificar-ticket"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id FROM tickets_verificacion WHERE cedula = $1 AND ticket = $2 AND usado = FALSE AND expira_en > NOW() ORDER BY creado_en DESC LIMIT 1",
+        "additionalFields": {
+          "queryParams": "={{ [$json.body.cedula, $json.body.ticket] }}"
+        }
+      },
+      "id": "d3333333-3333-4333-8333-333333333333",
+      "name": "Buscar Ticket Vigente (Postgres)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [460, 0],
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "REEMPLAZAR",
+          "name": "REEMPLAZAR con credenciales reales"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "cond1",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d4444444-4444-4444-8444-444444444444",
+      "name": "¿Ticket válido?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [720, 0]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE tickets_verificacion SET usado = TRUE WHERE id = $1",
+        "additionalFields": {
+          "queryParams": "={{ $json.id }}"
+        }
+      },
+      "id": "d5555555-5555-4555-8555-555555555555",
+      "name": "Marcar Ticket Usado (Postgres)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [980, -100],
+      "credentials": {
+        "postgres": {
+          "id": "REEMPLAZAR",
+          "name": "REEMPLAZAR con credenciales reales"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"valido\": true } }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "d6666666-6666-4666-8666-666666666666",
+      "name": "Responder: Válido",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1240, -100]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"valido\": false } }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "d7777777-7777-4777-8777-777777777777",
+      "name": "Responder: Inválido",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [980, 140]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Buscar Ticket Vigente (Postgres)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Ticket Vigente (Postgres)": {
+      "main": [
+        [
+          {
+            "node": "¿Ticket válido?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Ticket válido?": {
+      "main": [
+        [
+          {
+            "node": "Marcar Ticket Usado (Postgres)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder: Inválido",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Marcar Ticket Usado (Postgres)": {
+      "main": [
+        [
+          {
+            "node": "Responder: Válido",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

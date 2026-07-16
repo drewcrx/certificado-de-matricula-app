@@ -1,0 +1,24 @@
+// For information on how to create your own theme, please refer to:
+// https://ionicframework.com/docs/theming/
+
+// Paleta institucional real de Yavirac (azul marino + naranja), obtenida
+// muestreando el logo oficial en src/assets/icon/logo-yavirac.png.
+:root {
+  // Azul marino institucional (color principal: header, textos, bordes)
+  --ion-color-primary: #274386;
+  --ion-color-primary-rgb: 39, 67, 134;
+  --ion-color-primary-contrast: #ffffff;
+  --ion-color-primary-contrast-rgb: 255, 255, 255;
+  --ion-color-primary-shade: #223b76;
+  --ion-color-primary-tint: #3d5692;
+
+  // Naranja institucional (color de acento: botones de acción, mensajes del usuario)
+  --ion-color-secondary: #ff7123;
+  --ion-color-secondary-rgb: 255, 113, 35;
+  --ion-color-secondary-contrast: #1a1a1a;
+  --ion-color-secondary-contrast-rgb: 26, 26, 26;
+  --ion-color-secondary-shade: #e06319;
+  --ion-color-secondary-tint: #ff7f39;
+
+  --ion-color-light: #f2f4f9;
+}

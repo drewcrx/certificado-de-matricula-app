@@ -1,0 +1,244 @@
+.header-bot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  .avatar-bot {
+    background: #ffffff;
+    border-radius: 50%;
+    width: 42px;
+    height: 42px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    flex: 0 0 auto;
+    padding: 4px;
+    box-sizing: border-box;
+
+    img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+  }
+
+  .header-textos {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.1;
+
+    .nombre-bot {
+      font-weight: 700;
+      font-size: 16px;
+    }
+
+    .subtitulo-bot {
+      font-size: 11px;
+      opacity: 0.85;
+    }
+  }
+}
+
+.chat-content {
+  --background: var(--ion-color-light);
+}
+
+.chat-lista {
+  padding: 12px 10px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.fila {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.fila-usuario {
+  justify-content: flex-end;
+}
+
+.avatar-mini {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+  padding: 3px;
+  box-sizing: border-box;
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+}
+
+.burbuja {
+  max-width: 78%;
+  padding: 10px 14px;
+  border-radius: 16px;
+  font-size: 14.5px;
+  line-height: 1.35;
+}
+
+.burbuja-bot {
+  background: #ffffff;
+  color: #1f2430;
+  border-bottom-left-radius: 4px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.burbuja-usuario {
+  background: var(--ion-color-secondary);
+  color: var(--ion-color-secondary-contrast);
+  border-bottom-right-radius: 4px;
+}
+
+.burbuja-escribiendo {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 14px 16px;
+
+  .punto {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #9aa1b1;
+    animation: rebote 1.1s infinite ease-in-out;
+
+    &:nth-child(2) { animation-delay: 0.15s; }
+    &:nth-child(3) { animation-delay: 0.3s; }
+  }
+}
+
+@keyframes rebote {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.5; }
+  30% { transform: translateY(-4px); opacity: 1; }
+}
+
+.tarjeta {
+  background: #ffffff;
+  border-radius: 16px;
+  border-bottom-left-radius: 4px;
+  padding: 14px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+  max-width: 86%;
+  width: 100%;
+}
+
+.tarjeta-opciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+
+  ion-chip {
+    --background: #e8ecf7;
+    --color: var(--ion-color-primary);
+    cursor: pointer;
+  }
+
+  ion-chip.deshabilitado {
+    opacity: 0.55;
+  }
+}
+
+.tarjeta-preview,
+.tarjeta-certificado {
+  h3 {
+    margin: 0 0 8px;
+    font-size: 15px;
+    font-weight: 700;
+  }
+
+  ul {
+    list-style: none;
+    margin: 0 0 12px;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 13.5px;
+
+    li strong {
+      color: var(--ion-color-primary);
+    }
+  }
+}
+
+.tarjeta-certificado {
+  border: 1px dashed var(--ion-color-primary);
+  background: linear-gradient(180deg, #f5f8ff, #ffffff);
+}
+
+.encabezado-certificado {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--ion-color-primary);
+  margin-bottom: 6px;
+
+  ion-icon {
+    font-size: 16px;
+    color: var(--ion-color-secondary);
+  }
+}
+
+.nombre-certificado {
+  font-size: 16px;
+  font-weight: 700;
+  margin: 0 0 10px;
+}
+
+.zona-qr {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding-top: 6px;
+  border-top: 1px solid #eef0f5;
+
+  img {
+    width: 150px;
+    height: 150px;
+  }
+
+  .codigo-qr {
+    font-family: monospace;
+    font-size: 12px;
+    letter-spacing: 0.5px;
+    color: #6b7280;
+  }
+}
+
+.input-cedula {
+  --border-radius: 20px;
+  --background: #fff;
+  --color: #1f2430;
+  --placeholder-color: #8a90a2;
+  --placeholder-opacity: 1;
+  margin: 6px 10px;
+
+  ion-input {
+    --color: #1f2430;
+    --placeholder-color: #8a90a2;
+    --placeholder-opacity: 1;
+  }
+}
+
+.error-cedula {
+  color: var(--ion-color-danger);
+  font-size: 12px;
+  margin: 0 16px 8px;
+}

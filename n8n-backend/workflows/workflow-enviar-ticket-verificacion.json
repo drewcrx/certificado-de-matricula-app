@@ -1,0 +1,238 @@
+{
+  "name": "App Matrícula - Enviar Ticket de Verificación",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Enviar ticket de verificación\n- Busca al estudiante para obtener su correoInstitucional.\n- Genera un ticket de 6 dígitos y lo guarda en `tickets_verificacion` con expiración (ej. 10 min).\n- Envía el ticket por correo (nodo Send Email / SMTP — configúralo con las credenciales reales del correo institucional).\n- Responde solo con el correo enmascarado, NUNCA con el ticket real, en producción.\n- Ajusta el nodo Postgres al motor real de base de datos.",
+        "height": 260,
+        "width": 340
+      },
+      "id": "c1111111-1111-4111-8111-111111111111",
+      "name": "Nota",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-220, -60]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "enviar-ticket-verificacion",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "c2222222-2222-4222-8222-222222222222",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 0],
+      "webhookId": "enviar-ticket-verificacion"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT cedula, nombres, apellidos, correo_institucional AS \"correoInstitucional\" FROM estudiantes WHERE cedula = $1",
+        "additionalFields": {
+          "queryParams": "={{ $json.body.cedula }}"
+        }
+      },
+      "id": "c3333333-3333-4333-8333-333333333333",
+      "name": "Buscar Estudiante (Postgres)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [460, 0],
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "REEMPLAZAR",
+          "name": "REEMPLAZAR con credenciales reales"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "cond1",
+              "leftValue": "={{ $json.correoInstitucional }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "c4444444-4444-4444-8444-444444444444",
+      "name": "¿Existe el estudiante?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [720, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const ticket = Math.floor(100000 + Math.random() * 900000).toString();\n\nconst usuario = $json.correoInstitucional.split('@')[0];\nconst dominio = $json.correoInstitucional.split('@')[1];\nconst visible = usuario.slice(0, 2);\nconst correoEnmascarado = `${visible}${'*'.repeat(Math.max(usuario.length - 2, 3))}@${dominio}`;\n\n// Expira en 10 minutos\nconst expiraEn = new Date(Date.now() + 10 * 60 * 1000).toISOString();\n\nreturn [{\n  json: {\n    ...$json,\n    ticket,\n    correoEnmascarado,\n    expiraEn\n  }\n}];"
+      },
+      "id": "c5555555-5555-4555-8555-555555555555",
+      "name": "Generar Ticket",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [980, -120]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO tickets_verificacion (cedula, ticket, expira_en) VALUES ($1, $2, $3)",
+        "additionalFields": {
+          "queryParams": "={{ [$json.cedula, $json.ticket, $json.expiraEn] }}"
+        }
+      },
+      "id": "c6666666-6666-4666-8666-666666666666",
+      "name": "Guardar Ticket (Postgres)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [1240, -120],
+      "credentials": {
+        "postgres": {
+          "id": "REEMPLAZAR",
+          "name": "REEMPLAZAR con credenciales reales"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fromEmail": "no-responder@yavirac.edu.ec",
+        "toEmail": "={{ $json.correoInstitucional }}",
+        "subject": "Tu ticket de verificación - Yavirac",
+        "emailFormat": "text",
+        "text": "={{ \"Hola \" + $json.nombres + \",\\n\\nTu ticket de verificación es: \" + $json.ticket + \"\\n\\nEste ticket expira en 10 minutos. Si no lo solicitaste, ignora este correo.\" }}"
+      },
+      "id": "c7777777-7777-4777-8777-777777777777",
+      "name": "Enviar Correo (SMTP)",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [1500, -120],
+      "credentials": {
+        "smtp": {
+          "id": "REEMPLAZAR",
+          "name": "REEMPLAZAR con credenciales SMTP reales"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"correoEnmascarado\": $json.correoEnmascarado } }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "c8888888-8888-4888-8888-888888888888",
+      "name": "Responder: Ticket enviado",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1760, -120]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"error\": \"Estudiante no encontrado.\" } }}",
+        "options": {
+          "responseCode": 404
+        }
+      },
+      "id": "c9999999-9999-4999-8999-999999999999",
+      "name": "Responder: No encontrado",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [980, 160]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Buscar Estudiante (Postgres)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Estudiante (Postgres)": {
+      "main": [
+        [
+          {
+            "node": "¿Existe el estudiante?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Existe el estudiante?": {
+      "main": [
+        [
+          {
+            "node": "Generar Ticket",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder: No encontrado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generar Ticket": {
+      "main": [
+        [
+          {
+            "node": "Guardar Ticket (Postgres)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guardar Ticket (Postgres)": {
+      "main": [
+        [
+          {
+            "node": "Enviar Correo (SMTP)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar Correo (SMTP)": {
+      "main": [
+        [
+          {
+            "node": "Responder: Ticket enviado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

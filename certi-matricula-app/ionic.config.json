@@ -1,0 +1,7 @@
+{
+  "name": "certi-matricula-app",
+  "integrations": {
+    "capacitor": {}
+  },
+  "type": "angular"
+}
