@@ -3,10 +3,10 @@
     <ion-title>
       <div class="header-bot">
         <div class="avatar-bot">
-          <img src="assets/icon/logo-yavirac.png" alt="Logo Yavirac" />
+          <img src="assets/icon/yavibot-avatar.png" alt="YaviBot" />
         </div>
         <div class="header-textos">
-          <span class="nombre-bot">Yavirac</span>
+          <span class="nombre-bot">YaviBot</span>
           <span class="subtitulo-bot">Asistente virtual académico</span>
         </div>
       </div>
@@ -20,14 +20,14 @@
 
       <div class="fila fila-bot" *ngIf="m.tipo === 'bot-texto'">
         <div class="avatar-mini">
-          <img src="assets/icon/logo-yavirac.png" alt="Yavirac" />
+          <img src="assets/icon/yavibot-avatar.png" alt="YaviBot" />
         </div>
         <div class="burbuja burbuja-bot">{{ m.texto }}</div>
       </div>
 
       <div class="fila fila-bot" *ngIf="m.tipo === 'bot-escribiendo'">
         <div class="avatar-mini">
-          <img src="assets/icon/logo-yavirac.png" alt="Yavirac" />
+          <img src="assets/icon/yavibot-avatar.png" alt="YaviBot" />
         </div>
         <div class="burbuja burbuja-bot burbuja-escribiendo">
           <span class="punto"></span><span class="punto"></span><span class="punto"></span>
@@ -40,7 +40,7 @@
 
       <div class="fila fila-bot" *ngIf="m.tipo === 'bot-opciones'">
         <div class="avatar-mini">
-          <img src="assets/icon/logo-yavirac.png" alt="Yavirac" />
+          <img src="assets/icon/yavibot-avatar.png" alt="YaviBot" />
         </div>
         <div class="tarjeta tarjeta-opciones">
           <ion-chip
@@ -55,7 +55,7 @@
 
       <div class="fila fila-bot" *ngIf="m.tipo === 'bot-preview-certificado'">
         <div class="avatar-mini">
-          <img src="assets/icon/logo-yavirac.png" alt="Yavirac" />
+          <img src="assets/icon/yavibot-avatar.png" alt="YaviBot" />
         </div>
         <div class="tarjeta tarjeta-preview">
           <h3>Certificado de matrícula</h3>
@@ -79,7 +79,7 @@
 
       <div class="fila fila-bot" *ngIf="m.tipo === 'bot-resultado-certificado'">
         <div class="avatar-mini">
-          <img src="assets/icon/logo-yavirac.png" alt="Yavirac" />
+          <img src="assets/icon/yavibot-avatar.png" alt="YaviBot" />
         </div>
         <div class="tarjeta tarjeta-certificado">
           <div class="encabezado-certificado">
@@ -102,6 +102,29 @@
             <ion-icon slot="start" name="share-outline"></ion-icon>
             Compartir / Descargar
           </ion-button>
+        </div>
+      </div>
+
+      <div class="fila fila-bot" *ngIf="m.tipo === 'bot-tickets'">
+        <div class="avatar-mini">
+          <img src="assets/icon/yavibot-avatar.png" alt="YaviBot" />
+        </div>
+        <div class="tarjeta tarjeta-tickets">
+          <h3>Seguimiento de tickets</h3>
+          <div class="fila-ticket" *ngFor="let t of m.tickets">
+            <div class="fila-ticket-encabezado">
+              <span class="ticket-id">{{ t.id }}</span>
+              <span
+                class="ticket-estado"
+                [class.estado-completado]="t.estado === 'COMPLETADO'"
+                [class.estado-proceso]="t.estado === 'EN_PROCESO'"
+                [class.estado-rechazado]="t.estado === 'RECHAZADO'">
+                {{ t.estado === 'EN_PROCESO' ? 'En proceso' : (t.estado === 'COMPLETADO' ? 'Completado' : 'Rechazado') }}
+              </span>
+            </div>
+            <span class="ticket-tipo">{{ t.tipo }}</span>
+            <span class="ticket-fecha">{{ t.fechaSolicitud }}</span>
+          </div>
         </div>
       </div>
 
@@ -155,6 +178,13 @@
     <ion-button expand="block" fill="outline" (click)="nuevaConsulta()">
       <ion-icon slot="start" name="refresh-outline"></ion-icon>
       Nueva consulta
+    </ion-button>
+  </ion-toolbar>
+
+  <ion-toolbar *ngIf="estado === 'finalizado'">
+    <ion-button expand="block" fill="outline" (click)="nuevaConsulta()">
+      <ion-icon slot="start" name="refresh-outline"></ion-icon>
+      Iniciar nueva conversación
     </ion-button>
   </ion-toolbar>
 </ion-footer>

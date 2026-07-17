@@ -1,0 +1,115 @@
+{
+  "name": "App Matrícula - Consultar Tickets",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Consultar estado de mis tickets\n- Devuelve el historial de tickets_solicitud del estudiante, sin importar el tipo de trámite.\n- Si no tiene ninguno, responde con un array vacío [], no null ni error.\n- alwaysOutputData en el Postgres es necesario para que el Code corra igual con 0 filas (y filtre el placeholder vacío).\n- Ajusta el nodo Postgres al motor real de base de datos.",
+        "height": 240,
+        "width": 340
+      },
+      "id": "e1111111-1111-4111-8111-111111111111",
+      "name": "Nota",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-220, -40]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "consultar-tickets",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "e2222222-2222-4222-8222-222222222222",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 0],
+      "webhookId": "consultar-tickets"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT ts.id, tt.nombre AS \"tipo\", ts.estado, ts.fecha_solicitud FROM tickets_solicitud ts JOIN tipos_tramite tt ON tt.codigo = ts.tipo_tramite WHERE ts.cedula = $1 ORDER BY ts.fecha_solicitud DESC",
+        "additionalFields": {
+          "queryParams": "={{ $json.body.cedula }}"
+        }
+      },
+      "id": "e3333333-3333-4333-8333-333333333333",
+      "name": "Buscar Tickets (Postgres)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [460, 0],
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "REEMPLAZAR",
+          "name": "REEMPLAZAR con credenciales reales"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const tickets = $input.all()\n  .filter(item => item.json && item.json.id)\n  .map(item => {\n    const fecha = new Date(item.json.fecha_solicitud);\n    const fechaSolicitud = fecha.toLocaleDateString('es-EC', {\n      year: 'numeric', month: 'long', day: '2-digit'\n    });\n    return {\n      id: item.json.id,\n      tipo: item.json.tipo,\n      estado: item.json.estado,\n      fechaSolicitud\n    };\n  });\n\nreturn [{ json: { tickets } }];"
+      },
+      "id": "e4444444-4444-4444-8444-444444444444",
+      "name": "Formatear Tickets",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [720, 0]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json.tickets }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "e5555555-5555-4555-8555-555555555555",
+      "name": "Responder: Tickets",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [980, 0]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Buscar Tickets (Postgres)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Tickets (Postgres)": {
+      "main": [
+        [
+          {
+            "node": "Formatear Tickets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formatear Tickets": {
+      "main": [
+        [
+          {
+            "node": "Responder: Tickets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

@@ -28,13 +28,24 @@ export interface CertificadoMatricula {
 
 export type OpcionMenu =
   | 'CERTIFICADO_MATRICULA'
-  | 'HORARIO_CLASES'
-  | 'ESTADO_CUENTA'
-  | 'KARDEX';
+  | 'RECORD_ACADEMICO'
+  | 'CERTIFICADO_VINCULACION'
+  | 'ANULACION_MATRICULA'
+  | 'ESTADO_TICKETS'
+  | 'FINALIZAR_CONVERSACION';
 
 export interface OpcionChat {
   id: OpcionMenu;
   etiqueta: string;
   icono: string;
   disponible: boolean;
+}
+
+export type EstadoTicket = 'EN_PROCESO' | 'COMPLETADO' | 'RECHAZADO';
+
+export interface TicketSolicitud {
+  id: string;
+  tipo: string;
+  estado: EstadoTicket;
+  fechaSolicitud: string;
 }

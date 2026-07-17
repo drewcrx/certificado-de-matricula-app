@@ -1,52 +1,62 @@
-# Propuesta de backend (n8n) — App de Certificado de Matrícula
+# Backend (n8n) — App de Certificado de Matrícula
 
-Esto es una **propuesta de punto de partida** para el equipo de backend/web,
-generada desde el lado de la app móvil para que ambos equipos avancen sobre el
-mismo contrato de datos. No reemplaza su diseño de base de datos: solo
-describe qué necesita recibir la app y sugiere una forma de implementarlo.
+Esta es la **API propia de la app móvil**, construida enteramente en n8n
+(sin servidor intermedio). Es independiente de la que use el equipo de la
+web — ambas comparten la misma base de datos PostgreSQL una vez que exista.
+
+**Empieza por `ARQUITECTURA.md`** — explica por qué n8n es la API completa
+(no solo un consumidor), cómo están organizados los workflows por dominio, y
+el roadmap de fases. Este README es solo el índice de archivos.
 
 ## Contenido
 
-- **`CONTRATO-API.md`** — la especificación de los 4 webhooks que la app
-  necesita (request/response exactos, ya usados por el mock de la app).
-- **`workflows/workflow-consultar-estudiante.json`** — recibe una cédula,
-  consulta la base de datos y responde con los datos del estudiante (o `null`
-  si no existe).
-- **`workflows/workflow-enviar-ticket-verificacion.json`** — genera un ticket
-  de 6 dígitos, lo guarda con expiración y lo envía por correo al
-  `correoInstitucional` del estudiante (nodo SMTP, hay que configurar
-  credenciales de correo reales).
-- **`workflows/workflow-verificar-ticket.json`** — valida que el ticket
-  ingresado exista, no haya expirado y no se haya usado antes; lo marca como
-  usado si es válido.
-- **`workflows/workflow-generar-certificado.json`** — valida que el
-  estudiante esté matriculado, **revisa primero si ya existe un certificado
-  para esa cédula+periodo** (idempotencia: mismo QR sin importar si se pidió
-  desde la web o desde la app) y solo si no existe genera uno nuevo.
+- **`ARQUITECTURA.md`** — diseño general: capas, principios, seguridad,
+  patrón de sub-workflows, trámites automáticos vs. manuales, roadmap.
+- **`ESQUEMA-BD.md`** — esquema temporal completo de PostgreSQL (todas las
+  tablas y cómo se relacionan). Se adapta cuando llegue el esquema real
+  compartido con la web; el contrato de endpoints no cambia.
+- **`CONTRATO-API.md`** — especificación de los 6 webhooks (request/response
+  exactos, ya usados por el mock de la app).
+- **`workflows/`** — los 6 workflows de n8n importables que implementan el
+  contrato:
+  - `workflow-consultar-estudiante.json`
+  - `workflow-enviar-ticket-verificacion.json`
+  - `workflow-verificar-ticket.json`
+  - `workflow-generar-certificado.json` — el único trámite 100% automatizado;
+    genera el certificado+QR **y** su ticket de seguimiento en un solo flujo.
+  - `workflow-consultar-tickets.json` — historial de trámites del estudiante
+    (alimenta "Consultar estado de mis tickets" en la app).
+  - `workflow-crear-ticket-solicitud.json` — **genérico**: sirve para
+    cualquier trámite sin lógica automática propia (Récord Académico,
+    Certificado de Vinculación, Anulación de Matrícula, y los que se agreguen
+    a futuro). Agregar un trámite nuevo es una fila en `tipos_tramite`, no un
+    workflow nuevo.
 
 ## Cómo importar en n8n
 
-1. Abrir n8n → `Workflows` → `Import from File` (o arrastrar cada `.json`).
-2. En los nodos Postgres (o el que corresponda a su motor de base de datos),
-   configurar las credenciales reales.
-3. En `workflow-enviar-ticket-verificacion.json`, configurar además las
+1. Crear primero las tablas de `ESQUEMA-BD.md` en tu instancia de PostgreSQL
+   (aunque sea con datos de prueba — el esquema real llegará después).
+2. Abrir n8n → `Workflows` → `Import from File` (o arrastrar cada `.json`).
+3. En los nodos Postgres, configurar las credenciales reales.
+4. En `workflow-enviar-ticket-verificacion.json`, configurar además las
    credenciales SMTP del correo que enviará los tickets.
-4. Ajustar nombre de tabla/columnas si no coinciden con el esquema real
-   (`estudiantes`, `tickets_verificacion`, `certificados_matricula`).
-5. Activar los 4 workflows y copiar la URL base de los webhooks.
-6. Pasarme esa URL base — en la app solo hay que cambiar
-   `environment.n8nBaseUrl` y `environment.usarMock = false`.
+5. Ajustar nombre de tabla/columnas si no coinciden con el esquema real
+   cuando llegue (`estudiantes`, `tickets_verificacion`, `tipos_tramite`,
+   `tickets_solicitud`, `certificados_matricula`).
+6. Activar los 6 workflows y copiar la URL base de los webhooks.
+7. Pasarme esa URL base — en la app solo hay que cambiar
+   `environment.n8nBaseUrl` y `environment.usarMock = false` (en **ambos**
+   `environment.ts` y `environment.prod.ts`).
 
 ## Notas
 
-- El código único (`codigoUnico`) en el workflow de ejemplo se genera con
-  `Math.random()` por simplicidad. En producción se recomienda un UUID.
+- El código único del certificado (`codigoUnico`) se genera con
+  `Math.random()` por simplicidad. En producción se recomienda un UUID. El
+  `id` de los tickets sí se genera atómicamente en Postgres con
+  `nextval()`, seguro ante solicitudes concurrentes.
 - La **idempotencia es un requisito confirmado**, no opcional: dos personas
   (o la misma persona desde dos canales distintos) haciendo el mismo trámite
-  deben terminar viendo el mismo QR. Por eso la tabla `certificados_matricula`
-  sugiere `UNIQUE(cedula, periodo_actual)` y el workflow busca antes de crear.
-- Las tablas sugeridas (`certificados_matricula`, `tickets_verificacion`) están
-  en `CONTRATO-API.md` — el equipo de la web usará la primera para el endpoint
-  público de verificación del QR.
-- Estos workflows son una base editable, no un producto terminado: cámbienlos
-  con libertad según cómo esté modelada la base de datos real.
+  deben terminar viendo el mismo QR. Por eso `certificados_matricula` tiene
+  `UNIQUE(cedula, periodo_actual)` y el workflow busca antes de crear.
+- Estos workflows son una base editable, no un producto terminado: cámbialos
+  con libertad según cómo termine modelada la base de datos real.

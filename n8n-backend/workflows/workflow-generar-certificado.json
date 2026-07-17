@@ -3,15 +3,15 @@
   "nodes": [
     {
       "parameters": {
-        "content": "## Generar certificado de matrícula\n- Valida que el estudiante exista Y esté MATRICULADO antes de generar el código.\n- IDEMPOTENCIA (requisito confirmado por la coordinación académica): antes de generar un código nuevo, se busca si ya existe un certificado para esa cédula+periodo. Si existe, se devuelve el mismo (mismo QR), sin importar si el trámite se inició desde la web o desde la app.\n- El nodo Code genera el código único (cámbialo por un UUID real en producción).\n- El Insert deja el registro en `certificados_matricula` (con UNIQUE(cedula, periodo_actual) sugerido) para que el equipo de la web pueda validar el QR.\n- Ajusta el nodo Postgres al motor real de base de datos.",
-        "height": 280,
+        "content": "## Generar certificado de matrícula\n- Valida que el estudiante exista Y esté MATRICULADO antes de generar el código.\n- IDEMPOTENCIA (requisito confirmado por la coordinación académica): antes de generar un código nuevo, se busca si ya existe un certificado para esa cédula+periodo. Si existe, se devuelve el mismo (mismo QR), sin importar si el trámite se inició desde la web o desde la app.\n- Es el único trámite 100% automatizado: además del certificado, crea su propio ticket_solicitud en estado COMPLETADO (para que aparezca en 'Consultar estado de mis tickets').\n- El nodo Code genera el código único del certificado (cámbialo por un UUID real en producción). El id del ticket se genera atómicamente en Postgres con nextval().\n- Ajusta el nodo Postgres al motor real de base de datos.",
+        "height": 320,
         "width": 360
       },
       "id": "b1111111-1111-4111-8111-111111111111",
       "name": "Nota",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
-      "position": [-260, -80]
+      "position": [-260, -100]
     },
     {
       "parameters": {
@@ -89,7 +89,7 @@
       "name": "Buscar Certificado Existente (Postgres)",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 1,
-      "position": [980, -220],
+      "position": [980, -260],
       "alwaysOutputData": true,
       "credentials": {
         "postgres": {
@@ -125,7 +125,7 @@
       "name": "¿Ya existe certificado?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [1240, -220]
+      "position": [1240, -260]
     },
     {
       "parameters": {
@@ -140,13 +140,13 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "INSERT INTO certificados_matricula (codigo_unico, cedula, nombre_completo, carrera, nivel, periodo_actual, url_verificacion)\nVALUES ($1, $2, $3, $4, $5, $6, $7)",
+        "query": "INSERT INTO tickets_solicitud (id, cedula, tipo_tramite, estado, fecha_resolucion)\nVALUES (\n  'TCK-' || EXTRACT(YEAR FROM NOW()) || '-' || LPAD(nextval('tickets_solicitud_seq')::text, 6, '0'),\n  $1, 'CERTIFICADO_MATRICULA', 'COMPLETADO', NOW()\n)\nRETURNING id",
         "additionalFields": {
-          "queryParams": "={{ [$json.codigoUnico, $json.cedula, $json.nombreCompleto, $json.carrera, $json.nivel, $json.periodoActual, $json.urlVerificacion] }}"
+          "queryParams": "={{ $json.cedula }}"
         }
       },
-      "id": "b6666666-6666-4666-8666-666666666666",
-      "name": "Guardar Certificado (Postgres)",
+      "id": "bcccccc1-cccc-4ccc-8ccc-ccccccccccc1",
+      "name": "Crear Ticket del Trámite (Postgres)",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 1,
       "position": [1240, -20],
@@ -159,17 +159,51 @@
     },
     {
       "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO certificados_matricula (ticket_id, codigo_unico, cedula, nombre_completo, carrera, nivel, periodo_actual, url_verificacion)\nVALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+        "additionalFields": {
+          "queryParams": "={{ [$json.id, $('Generar Código Único').item.json.codigoUnico, $('Generar Código Único').item.json.cedula, $('Generar Código Único').item.json.nombreCompleto, $('Generar Código Único').item.json.carrera, $('Generar Código Único').item.json.nivel, $('Generar Código Único').item.json.periodoActual, $('Generar Código Único').item.json.urlVerificacion] }}"
+        }
+      },
+      "id": "b6666666-6666-4666-8666-666666666666",
+      "name": "Guardar Certificado (Postgres)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [1500, -20],
+      "credentials": {
+        "postgres": {
+          "id": "REEMPLAZAR",
+          "name": "REEMPLAZAR con credenciales reales"
+        }
+      }
+    },
+    {
+      "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ {\n  \"codigoUnico\": $json.codigoUnico,\n  \"cedula\": $json.cedula,\n  \"nombreCompleto\": $json.nombreCompleto,\n  \"carrera\": $json.carrera,\n  \"nivel\": $json.nivel,\n  \"periodoActual\": $json.periodoActual,\n  \"fechaEmision\": $json.fechaEmision,\n  \"urlVerificacion\": $json.urlVerificacion\n} }}",
+        "responseBody": "={{ $json }}",
         "options": {
           "responseCode": 200
         }
       },
       "id": "b7777777-7777-4777-8777-777777777777",
-      "name": "Responder: Certificado generado",
+      "name": "Responder: Certificado existente",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [1500, -120]
+      "position": [1500, -260]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {\n  \"codigoUnico\": $('Generar Código Único').item.json.codigoUnico,\n  \"cedula\": $('Generar Código Único').item.json.cedula,\n  \"nombreCompleto\": $('Generar Código Único').item.json.nombreCompleto,\n  \"carrera\": $('Generar Código Único').item.json.carrera,\n  \"nivel\": $('Generar Código Único').item.json.nivel,\n  \"periodoActual\": $('Generar Código Único').item.json.periodoActual,\n  \"fechaEmision\": $('Generar Código Único').item.json.fechaEmision,\n  \"urlVerificacion\": $('Generar Código Único').item.json.urlVerificacion\n} }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "bddddddd-dddd-4ddd-8ddd-ddddddddddd1",
+      "name": "Responder: Certificado nuevo",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1760, -120]
     },
     {
       "parameters": {
@@ -183,7 +217,7 @@
       "name": "Responder: No matriculado",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [980, 220]
+      "position": [980, 260]
     }
   ],
   "connections": {
@@ -242,7 +276,7 @@
       "main": [
         [
           {
-            "node": "Responder: Certificado generado",
+            "node": "Responder: Certificado existente",
             "type": "main",
             "index": 0
           }
@@ -260,6 +294,17 @@
       "main": [
         [
           {
+            "node": "Crear Ticket del Trámite (Postgres)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Crear Ticket del Trámite (Postgres)": {
+      "main": [
+        [
+          {
             "node": "Guardar Certificado (Postgres)",
             "type": "main",
             "index": 0
@@ -271,7 +316,7 @@
       "main": [
         [
           {
-            "node": "Responder: Certificado generado",
+            "node": "Responder: Certificado nuevo",
             "type": "main",
             "index": 0
           }

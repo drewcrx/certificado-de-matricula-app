@@ -10,7 +10,8 @@ import { validarCedulaEcuatoriana } from '../utils/validar-cedula';
 import {
   CertificadoMatricula,
   Estudiante,
-  OpcionChat
+  OpcionChat,
+  TicketSolicitud
 } from '../models/estudiante.model';
 
 const LONGITUD_TICKET_VERIFICACION = 6;
@@ -21,7 +22,8 @@ type TipoMensaje =
   | 'usuario-texto'
   | 'bot-opciones'
   | 'bot-preview-certificado'
-  | 'bot-resultado-certificado';
+  | 'bot-resultado-certificado'
+  | 'bot-tickets';
 
 interface ChatMensaje {
   tipo: TipoMensaje;
@@ -29,6 +31,7 @@ interface ChatMensaje {
   estudiante?: Estudiante;
   certificado?: CertificadoMatricula;
   qrDataUrl?: string;
+  tickets?: TicketSolicitud[];
 }
 
 type EstadoConversacion =
@@ -40,13 +43,17 @@ type EstadoConversacion =
   | 'menu'
   | 'preview_certificado'
   | 'generando_certificado'
-  | 'resultado';
+  | 'resultado'
+  | 'consultando_tickets'
+  | 'finalizado';
 
 const OPCIONES_MENU: OpcionChat[] = [
-  { id: 'CERTIFICADO_MATRICULA', etiqueta: 'Certificado de matrícula', icono: 'document-text-outline', disponible: true },
-  { id: 'HORARIO_CLASES', etiqueta: 'Horario de clases', icono: 'calendar-outline', disponible: false },
-  { id: 'ESTADO_CUENTA', etiqueta: 'Estado de cuenta', icono: 'cash-outline', disponible: false },
-  { id: 'KARDEX', etiqueta: 'Kardex académico', icono: 'school-outline', disponible: false }
+  { id: 'CERTIFICADO_MATRICULA', etiqueta: 'Solicitar Certificado de Matrícula', icono: 'document-text-outline', disponible: true },
+  { id: 'RECORD_ACADEMICO', etiqueta: 'Solicitar Récord Académico', icono: 'school-outline', disponible: false },
+  { id: 'CERTIFICADO_VINCULACION', etiqueta: 'Solicitar Certificado de Vinculación', icono: 'link-outline', disponible: false },
+  { id: 'ANULACION_MATRICULA', etiqueta: 'Solicitar Anulación de Matrícula', icono: 'close-circle-outline', disponible: false },
+  { id: 'ESTADO_TICKETS', etiqueta: 'Consultar estado de mis tickets', icono: 'list-outline', disponible: true },
+  { id: 'FINALIZAR_CONVERSACION', etiqueta: 'Finalizar conversación', icono: 'exit-outline', disponible: true }
 ];
 
 @Component({
@@ -84,7 +91,7 @@ export class ChatPage implements OnInit {
     this.ticketIngresado = '';
     this.errorTicket = '';
 
-    await this.hablar('¡Hola! 👋 Soy Yavirac, tu asistente virtual académico.');
+    await this.hablar('¡Hola! 👋 Soy YaviBot, tu asistente virtual académico.');
     await this.hablar('Para ayudarte, primero necesito verificar tu identidad. Por favor ingresa tu número de cédula.');
     this.estado = 'esperando_cedula';
   }
@@ -223,7 +230,53 @@ export class ChatPage implements OnInit {
       await this.hablar('Estos son tus datos. Verifícalos antes de generar tu certificado:');
       this.agregarMensaje({ tipo: 'bot-preview-certificado', estudiante: this.estudianteActual });
       this.estado = 'preview_certificado';
+      return;
     }
+
+    if (opcion.id === 'ESTADO_TICKETS') {
+      await this.consultarEstadoTickets(this.estudianteActual);
+      return;
+    }
+
+    if (opcion.id === 'FINALIZAR_CONVERSACION') {
+      await this.finalizarConversacion();
+      return;
+    }
+  }
+
+  private async consultarEstadoTickets(estudiante: Estudiante): Promise<void> {
+    this.estado = 'consultando_tickets';
+
+    if (!(await this.requiereConexion())) {
+      this.estado = 'menu';
+      return;
+    }
+
+    this.mostrarEscribiendo();
+    this.estudianteService.consultarTicketsSolicitud(estudiante.cedula).subscribe({
+      next: async tickets => {
+        this.quitarEscribiendo();
+        if (tickets.length === 0) {
+          await this.hablar('No tienes tickets registrados todavía.');
+        } else {
+          await this.hablar('Este es el seguimiento de tus tickets:');
+          this.agregarMensaje({ tipo: 'bot-tickets', tickets });
+        }
+        this.agregarMensaje({ tipo: 'bot-opciones' });
+        this.estado = 'menu';
+      },
+      error: async () => {
+        this.quitarEscribiendo();
+        await this.hablar('No pude consultar tus tickets en este momento. Intenta nuevamente en unos segundos.');
+        this.agregarMensaje({ tipo: 'bot-opciones' });
+        this.estado = 'menu';
+      }
+    });
+  }
+
+  private async finalizarConversacion(): Promise<void> {
+    await this.hablar('¡Gracias por usar YaviBot! Que tengas un excelente día 👋');
+    this.estado = 'finalizado';
   }
 
   async generarCertificado(): Promise<void> {

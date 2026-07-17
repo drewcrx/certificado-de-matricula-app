@@ -1,0 +1,300 @@
+{
+  "name": "App Matrícula - Crear Ticket de Solicitud (genérico)",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Crear ticket de solicitud (genérico)\n- Sirve para CUALQUIER trámite que no tenga workflow propio (Récord Académico, Certificado de Vinculación, Anulación de Matrícula, y los que se agreguen a futuro).\n- Para agregar un trámite nuevo: una fila en tipos_tramite. Este workflow no cambia.\n- Solo crea el ticket en EN_PROCESO; lo resuelve manualmente el personal administrativo.\n- El id del ticket se genera atómicamente en Postgres con nextval(), no en JS.\n- Ajusta el nodo Postgres al motor real de base de datos.",
+        "height": 280,
+        "width": 360
+      },
+      "id": "f1111111-1111-4111-8111-111111111111",
+      "name": "Nota",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-260, -80]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "crear-ticket-solicitud",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "f2222222-2222-4222-8222-222222222222",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 0],
+      "webhookId": "crear-ticket-solicitud"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT cedula FROM estudiantes WHERE cedula = $1",
+        "additionalFields": {
+          "queryParams": "={{ $json.body.cedula }}"
+        }
+      },
+      "id": "f3333333-3333-4333-8333-333333333333",
+      "name": "Buscar Estudiante (Postgres)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [460, 0],
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "REEMPLAZAR",
+          "name": "REEMPLAZAR con credenciales reales"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "cond1",
+              "leftValue": "={{ $json.cedula }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "f4444444-4444-4444-8444-444444444444",
+      "name": "¿Existe el estudiante?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [720, 0]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT codigo, nombre FROM tipos_tramite WHERE codigo = $1",
+        "additionalFields": {
+          "queryParams": "={{ $('Webhook').item.json.body.tipoTramite }}"
+        }
+      },
+      "id": "f5555555-5555-4555-8555-555555555555",
+      "name": "Buscar Tipo de Trámite (Postgres)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [980, -120],
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "REEMPLAZAR",
+          "name": "REEMPLAZAR con credenciales reales"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "cond1",
+              "leftValue": "={{ $json.codigo }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "f6666666-6666-4666-8666-666666666666",
+      "name": "¿Tipo de trámite válido?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1240, -120]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO tickets_solicitud (id, cedula, tipo_tramite, estado)\nVALUES (\n  'TCK-' || EXTRACT(YEAR FROM NOW()) || '-' || LPAD(nextval('tickets_solicitud_seq')::text, 6, '0'),\n  $1, $2, 'EN_PROCESO'\n)\nRETURNING id, cedula, tipo_tramite, estado, fecha_solicitud",
+        "additionalFields": {
+          "queryParams": "={{ [$('Webhook').item.json.body.cedula, $('Webhook').item.json.body.tipoTramite] }}"
+        }
+      },
+      "id": "f7777777-7777-4777-8777-777777777777",
+      "name": "Crear Ticket (Postgres)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [1500, -120],
+      "credentials": {
+        "postgres": {
+          "id": "REEMPLAZAR",
+          "name": "REEMPLAZAR con credenciales reales"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const fecha = new Date($json.fecha_solicitud);\nconst fechaSolicitud = fecha.toLocaleDateString('es-EC', {\n  year: 'numeric', month: 'long', day: '2-digit'\n});\n\nreturn [{\n  json: {\n    id: $json.id,\n    tipo: $('Buscar Tipo de Trámite (Postgres)').item.json.nombre,\n    estado: $json.estado,\n    fechaSolicitud\n  }\n}];"
+      },
+      "id": "f8888888-8888-4888-8888-888888888888",
+      "name": "Formatear Respuesta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1760, -120]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "f9999999-9999-4999-8999-999999999999",
+      "name": "Responder: Ticket creado",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [2020, -120]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"error\": \"Tipo de trámite no reconocido.\" } }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "faaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      "name": "Responder: Tipo inválido",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1500, 160]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"error\": \"Estudiante no encontrado.\" } }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "fbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      "name": "Responder: Estudiante no encontrado",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [980, 200]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Buscar Estudiante (Postgres)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Estudiante (Postgres)": {
+      "main": [
+        [
+          {
+            "node": "¿Existe el estudiante?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Existe el estudiante?": {
+      "main": [
+        [
+          {
+            "node": "Buscar Tipo de Trámite (Postgres)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder: Estudiante no encontrado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Tipo de Trámite (Postgres)": {
+      "main": [
+        [
+          {
+            "node": "¿Tipo de trámite válido?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Tipo de trámite válido?": {
+      "main": [
+        [
+          {
+            "node": "Crear Ticket (Postgres)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder: Tipo inválido",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Crear Ticket (Postgres)": {
+      "main": [
+        [
+          {
+            "node": "Formatear Respuesta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formatear Respuesta": {
+      "main": [
+        [
+          {
+            "node": "Responder: Ticket creado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

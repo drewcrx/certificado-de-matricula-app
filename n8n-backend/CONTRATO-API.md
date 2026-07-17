@@ -6,13 +6,16 @@ datos simulados que ya respetan exactamente este contrato — el día que estos
 webhooks estén activos, en la app solo se cambia `environment.usarMock = false`
 y `environment.n8nBaseUrl`, sin tocar el resto del código.
 
+Ver `ARQUITECTURA.md` para el diseño general (por qué n8n es la API completa,
+no solo un consumidor) y `ESQUEMA-BD.md` para todas las tablas.
+
 Base URL sugerida: `https://TU-INSTANCIA-N8N.example.com/webhook`
 
 ---
 
 ## 1. Consultar estudiante por cédula
 
-Se usa cuando el "robot" (Yavirac) recibe la cédula escrita por el estudiante y
+Se usa cuando el "robot" (YaviBot) recibe la cédula escrita por el estudiante y
 necesita saber quién es y si existe en la base de datos.
 
 **POST** `/consultar-estudiante`
@@ -177,6 +180,11 @@ Reglas importantes para el backend:
   resultado debe ser siempre el mismo código verificable. (La app ya simula
   este comportamiento en modo mock: generar el certificado dos veces para el
   mismo estudiante devuelve el mismo QR).
+- Este trámite es el único **100% automatizado** del menú (ver
+  `ARQUITECTURA.md`). Al generarse, además de la fila en
+  `certificados_matricula`, el workflow crea un `ticket_solicitud` asociado
+  con `estado = 'COMPLETADO'`, para que aparezca en "Consultar estado de mis
+  tickets" (endpoint 5) igual que cualquier otro trámite.
 
 ### Response — 400 (no matriculado / cédula inválida)
 
@@ -188,49 +196,101 @@ Reglas importantes para el backend:
 
 ---
 
-## Tabla sugerida para persistir certificados emitidos
+## 5. Consultar estado de mis tickets
 
-```sql
-CREATE TABLE certificados_matricula (
-  id               SERIAL PRIMARY KEY,
-  codigo_unico     VARCHAR(40) NOT NULL UNIQUE,
-  cedula           VARCHAR(10) NOT NULL,
-  nombre_completo  VARCHAR(150) NOT NULL,
-  carrera          VARCHAR(150) NOT NULL,
-  nivel            VARCHAR(50) NOT NULL,
-  periodo_actual   VARCHAR(50) NOT NULL,
-  fecha_emision    TIMESTAMP NOT NULL DEFAULT NOW(),
-  url_verificacion TEXT NOT NULL,
-  UNIQUE (cedula, periodo_actual)
-);
+Alimenta la pantalla "Consultar estado de mis tickets" del menú. Devuelve el
+historial completo de trámites del estudiante (matrícula, récord académico,
+vinculación, anulación — todos los tipos), más reciente primero.
+
+**POST** `/consultar-tickets`
+
+### Request
+
+```json
+{
+  "cedula": "0102030405"
+}
 ```
 
-El `UNIQUE (cedula, periodo_actual)` es justamente lo que garantiza la regla
-de idempotencia de arriba a nivel de base de datos: es imposible que existan
-dos certificados distintos para el mismo estudiante en el mismo periodo, sin
-importar cuántas veces lo pida ni desde qué canal (web o app).
+### Response — 200 OK
 
-El equipo de la web usará esta misma tabla (`codigo_unico`) para el endpoint
-de verificación pública del QR.
+```json
+[
+  {
+    "id": "TCK-2026-000123",
+    "tipo": "Récord Académico",
+    "estado": "EN_PROCESO",
+    "fechaSolicitud": "10 de julio de 2026"
+  },
+  {
+    "id": "MAT-2026-9F3K7QZP",
+    "tipo": "Certificado de Matrícula",
+    "estado": "COMPLETADO",
+    "fechaSolicitud": "15 de julio de 2026"
+  }
+]
+```
+
+`estado` solo admite `"EN_PROCESO"`, `"COMPLETADO"` o `"RECHAZADO"`. Si el
+estudiante no tiene tickets, responder `200` con `[]` (no `null`, no error).
 
 ---
 
-## Tabla sugerida para los tickets de verificación por correo
+## 6. Crear ticket de solicitud (trámites sin automatizar)
 
-```sql
-CREATE TABLE tickets_verificacion (
-  id          SERIAL PRIMARY KEY,
-  cedula      VARCHAR(10) NOT NULL,
-  ticket      VARCHAR(6) NOT NULL,
-  creado_en   TIMESTAMP NOT NULL DEFAULT NOW(),
-  expira_en   TIMESTAMP NOT NULL,
-  usado       BOOLEAN NOT NULL DEFAULT FALSE
-);
+Endpoint **genérico** para los trámites que todavía no tienen lógica
+automática propia (Récord Académico, Certificado de Vinculación, Anulación de
+Matrícula). Solo registra el ticket en estado `EN_PROCESO`; lo resuelve
+manualmente el personal administrativo (fuera del alcance de esta app). Ver
+`ARQUITECTURA.md` → "Trámites: automáticos vs. manuales".
+
+> Nota: la app todavía no llama este endpoint — esas 3 opciones del menú
+> siguen marcadas `disponible: false` ("en construcción"). El backend ya
+> queda listo para cuando se conecten (Fase 2 del roadmap); ese cambio en la
+> app es pequeño y se hace por separado.
+
+**POST** `/crear-ticket-solicitud`
+
+### Request
+
+```json
+{
+  "cedula": "0102030405",
+  "tipoTramite": "RECORD_ACADEMICO"
+}
 ```
 
-Recomendación: al generar un ticket nuevo para una cédula, invalidar
-(`usado = TRUE` o eliminar) los tickets anteriores de esa misma cédula, para
-que solo el último enviado sea válido.
+`tipoTramite` debe ser uno de los `codigo` definidos en la tabla
+`tipos_tramite` (`ESQUEMA-BD.md`): `RECORD_ACADEMICO`,
+`CERTIFICADO_VINCULACION`, `ANULACION_MATRICULA` (o cualquier trámite nuevo
+que se agregue ahí a futuro — este endpoint no necesita cambiar).
+
+### Response — 200 OK
+
+```json
+{
+  "id": "TCK-2026-000124",
+  "tipo": "Récord Académico",
+  "estado": "EN_PROCESO",
+  "fechaSolicitud": "16 de julio de 2026"
+}
+```
+
+### Response — 400 (cédula o tipoTramite inválido)
+
+```json
+{
+  "error": "Tipo de trámite no reconocido."
+}
+```
+
+---
+
+## Base de datos
+
+Ver `ESQUEMA-BD.md` para las tablas completas (`estudiantes`,
+`tickets_verificacion`, `tipos_tramite`, `tickets_solicitud`,
+`certificados_matricula`) y cómo se relacionan.
 
 ---
 
@@ -243,6 +303,8 @@ n8n) como punto de partida:
 - `workflow-enviar-ticket-verificacion.json`
 - `workflow-verificar-ticket.json`
 - `workflow-generar-certificado.json`
+- `workflow-consultar-tickets.json`
+- `workflow-crear-ticket-solicitud.json`
 
 Todos usan un nodo Postgres como ejemplo — si la base de datos es MySQL, SQL
 Server u otra, solo hay que reemplazar ese nodo por el equivalente y ajustar

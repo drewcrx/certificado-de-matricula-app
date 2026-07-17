@@ -3,7 +3,12 @@ import { HttpClient } from '@angular/common/http';
 import { Observable, of, throwError } from 'rxjs';
 import { delay, map } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
-import { CertificadoMatricula, EnvioTicketVerificacion, Estudiante } from '../models/estudiante.model';
+import {
+  CertificadoMatricula,
+  EnvioTicketVerificacion,
+  Estudiante,
+  TicketSolicitud
+} from '../models/estudiante.model';
 
 /**
  * Datos de prueba usados SOLO mientras environment.usarMock === true.
@@ -58,6 +63,14 @@ export class EstudianteService {
    * estudiante genera el certificado desde la web y desde la app).
    */
   private certificadosEmitidosMock = new Map<string, CertificadoMatricula>();
+
+  /**
+   * Solo usado en modo mock: simula la tabla de tickets de solicitud
+   * (trámites) por cédula. Se siembra con un par de tickets de ejemplo para
+   * que la pantalla de seguimiento no se vea vacía en la demo, y se le suman
+   * tickets nuevos cada vez que el estudiante genera un certificado.
+   */
+  private ticketsSolicitudMock = new Map<string, TicketSolicitud[]>();
 
   constructor(private http: HttpClient) {}
 
@@ -121,6 +134,26 @@ export class EstudianteService {
   }
 
   /**
+   * Equivale al webhook de n8n que devuelve el historial de tickets
+   * (trámites) del estudiante, para la pantalla de "Consultar estado de mis
+   * tickets".
+   * Webhook real esperado: POST {n8nBaseUrl}/consultar-tickets  body: { cedula }
+   */
+  consultarTicketsSolicitud(cedula: string): Observable<TicketSolicitud[]> {
+    if (environment.usarMock) {
+      const tickets = this.obtenerOSembrarTickets(cedula);
+      // Más reciente primero.
+      const ordenados = [...tickets].sort((a, b) => (a.id < b.id ? 1 : -1));
+      return of(ordenados).pipe(delay(800));
+    }
+
+    return this.http.post<TicketSolicitud[]>(
+      `${environment.n8nBaseUrl}/consultar-tickets`,
+      { cedula }
+    );
+  }
+
+  /**
    * Equivale al webhook de n8n que genera el certificado de matrícula y
    * devuelve el código único (para el QR) que el sistema web validará
    * contra la base de datos.
@@ -160,6 +193,12 @@ export class EstudianteService {
       };
       certificado.urlVerificacion = `https://verificacion.tudominio.edu.ec/certificados/${certificado.codigoUnico}`;
       this.certificadosEmitidosMock.set(claveCertificado, certificado);
+      this.registrarTicket(cedula, {
+        id: certificado.codigoUnico,
+        tipo: 'Certificado de Matrícula',
+        estado: 'COMPLETADO',
+        fechaSolicitud: certificado.fechaEmision
+      });
 
       return of(certificado).pipe(delay(1300));
     }
@@ -168,6 +207,32 @@ export class EstudianteService {
       `${environment.n8nBaseUrl}/generar-certificado-matricula`,
       { cedula }
     );
+  }
+
+  private obtenerOSembrarTickets(cedula: string): TicketSolicitud[] {
+    if (!this.ticketsSolicitudMock.has(cedula)) {
+      const anio = new Date().getFullYear();
+      this.ticketsSolicitudMock.set(cedula, [
+        {
+          id: `TCK-${anio}-000123`,
+          tipo: 'Récord Académico',
+          estado: 'EN_PROCESO',
+          fechaSolicitud: '10 de julio de 2026'
+        },
+        {
+          id: `TCK-${anio}-000098`,
+          tipo: 'Certificado de Vinculación',
+          estado: 'RECHAZADO',
+          fechaSolicitud: '02 de julio de 2026'
+        }
+      ]);
+    }
+    return this.ticketsSolicitudMock.get(cedula)!;
+  }
+
+  private registrarTicket(cedula: string, ticket: TicketSolicitud): void {
+    const tickets = this.obtenerOSembrarTickets(cedula);
+    tickets.push(ticket);
   }
 
   private generarCodigoUnicoMock(): string {
