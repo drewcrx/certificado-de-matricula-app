@@ -1,17 +1,20 @@
 import { Component, OnInit, ViewChild } from '@angular/core';
 import { IonContent } from '@ionic/angular';
 import * as QRCode from 'qrcode';
-import { Capacitor } from '@capacitor/core';
-import { Directory, Filesystem } from '@capacitor/filesystem';
+import { firstValueFrom } from 'rxjs';
 import { Network } from '@capacitor/network';
-import { Share } from '@capacitor/share';
 import { EstudianteService } from '../services/estudiante.service';
+import { CertificadoPdfService } from '../services/certificado-pdf.service';
 import { validarCedulaEcuatoriana } from '../utils/validar-cedula';
 import {
   CertificadoMatricula,
+  Docente,
   Estudiante,
+  IncidenciaLaboratorio,
+  Laboratorio,
   OpcionChat,
-  TicketSolicitud
+  TicketSolicitud,
+  Usuario
 } from '../models/estudiante.model';
 
 const LONGITUD_TICKET_VERIFICACION = 6;
@@ -23,7 +26,11 @@ type TipoMensaje =
   | 'bot-opciones'
   | 'bot-preview-certificado'
   | 'bot-resultado-certificado'
-  | 'bot-tickets';
+  | 'bot-tickets'
+  | 'bot-confirmacion-anulacion'
+  | 'bot-laboratorios'
+  | 'bot-confirmacion-incidencia'
+  | 'bot-resultado-incidencia';
 
 interface ChatMensaje {
   tipo: TipoMensaje;
@@ -32,6 +39,11 @@ interface ChatMensaje {
   certificado?: CertificadoMatricula;
   qrDataUrl?: string;
   tickets?: TicketSolicitud[];
+  laboratorios?: Laboratorio[];
+  laboratorioSeleccionado?: Laboratorio;
+  descripcionIncidencia?: string;
+  fotoPreviewUrl?: string;
+  incidencia?: IncidenciaLaboratorio;
 }
 
 type EstadoConversacion =
@@ -45,14 +57,28 @@ type EstadoConversacion =
   | 'generando_certificado'
   | 'resultado'
   | 'consultando_tickets'
+  | 'confirmando_anulacion'
+  | 'procesando_anulacion'
+  | 'seleccionando_laboratorio'
+  | 'escribiendo_incidencia'
+  | 'adjuntando_foto'
+  | 'confirmando_incidencia'
+  | 'reportando_incidencia'
   | 'finalizado';
 
-const OPCIONES_MENU: OpcionChat[] = [
+const OPCIONES_MENU_ESTUDIANTE: OpcionChat[] = [
   { id: 'CERTIFICADO_MATRICULA', etiqueta: 'Solicitar Certificado de Matrícula', icono: 'document-text-outline', disponible: true },
-  { id: 'RECORD_ACADEMICO', etiqueta: 'Solicitar Récord Académico', icono: 'school-outline', disponible: false },
-  { id: 'CERTIFICADO_VINCULACION', etiqueta: 'Solicitar Certificado de Vinculación', icono: 'link-outline', disponible: false },
-  { id: 'ANULACION_MATRICULA', etiqueta: 'Solicitar Anulación de Matrícula', icono: 'close-circle-outline', disponible: false },
+  { id: 'ANULACION_MATRICULA', etiqueta: 'Solicitar Anulación de Matrícula', icono: 'close-circle-outline', disponible: true },
   { id: 'ESTADO_TICKETS', etiqueta: 'Consultar estado de mis tickets', icono: 'list-outline', disponible: true },
+  { id: 'FINALIZAR_CONVERSACION', etiqueta: 'Finalizar conversación', icono: 'exit-outline', disponible: true }
+];
+
+/**
+ * El rol Docente solo tiene un trámite disponible por ahora (ver
+ * ARQUITECTURA.md, "Rol Docente") — no comparte los trámites de estudiante.
+ */
+const OPCIONES_MENU_DOCENTE: OpcionChat[] = [
+  { id: 'REPORTAR_INCIDENCIA_LAB', etiqueta: 'Reportar incidencia en laboratorio', icono: 'alert-circle-outline', disponible: true },
   { id: 'FINALIZAR_CONVERSACION', etiqueta: 'Finalizar conversación', icono: 'exit-outline', disponible: true }
 ];
 
@@ -66,7 +92,6 @@ export class ChatPage implements OnInit {
   @ViewChild(IonContent) contenido!: IonContent;
 
   mensajes: ChatMensaje[] = [];
-  opcionesMenu = OPCIONES_MENU;
 
   estado: EstadoConversacion = 'esperando_cedula';
   cedulaIngresada = '';
@@ -75,21 +100,37 @@ export class ChatPage implements OnInit {
   ticketIngresado = '';
   errorTicket = '';
 
-  estudianteActual: Estudiante | null = null;
+  descripcionIncidencia = '';
+  errorFoto = '';
+  fotoSeleccionada: { base64: string; mime: string; previewUrl: string } | null = null;
 
-  constructor(private estudianteService: EstudianteService) {}
+  usuarioActual: Usuario | null = null;
+  private laboratorioSeleccionado: Laboratorio | null = null;
+  private descripcionPendiente = '';
+
+  constructor(
+    private estudianteService: EstudianteService,
+    private certificadoPdfService: CertificadoPdfService
+  ) {}
 
   ngOnInit(): void {
     this.iniciarConversacion();
   }
 
+  get opcionesMenu(): OpcionChat[] {
+    return this.usuarioActual?.tipoUsuario === 'DOCENTE' ? OPCIONES_MENU_DOCENTE : OPCIONES_MENU_ESTUDIANTE;
+  }
+
   private async iniciarConversacion(): Promise<void> {
     this.mensajes = [];
-    this.estudianteActual = null;
+    this.usuarioActual = null;
     this.cedulaIngresada = '';
     this.errorCedula = '';
     this.ticketIngresado = '';
     this.errorTicket = '';
+    this.descripcionIncidencia = '';
+    this.laboratorioSeleccionado = null;
+    this.descripcionPendiente = '';
 
     await this.hablar('¡Hola! 👋 Soy YaviBot, tu asistente virtual académico.');
     await this.hablar('Para ayudarte, primero necesito verificar tu identidad. Por favor ingresa tu número de cédula.');
@@ -121,16 +162,16 @@ export class ChatPage implements OnInit {
 
     this.mostrarEscribiendo();
     this.estudianteService.consultarPorCedula(cedula).subscribe({
-      next: async estudiante => {
+      next: async usuario => {
         this.quitarEscribiendo();
-        if (!estudiante) {
-          await this.hablar('No encontré ningún estudiante con esa cédula. ¿Puedes verificar el número e intentarlo de nuevo?');
+        if (!usuario) {
+          await this.hablar('No encontré ningún estudiante ni docente con esa cédula. ¿Puedes verificar el número e intentarlo de nuevo?');
           this.estado = 'esperando_cedula';
           return;
         }
 
-        this.estudianteActual = estudiante;
-        await this.enviarTicketDeVerificacion(estudiante);
+        this.usuarioActual = usuario;
+        await this.enviarTicketDeVerificacion(usuario);
       },
       error: async () => {
         this.quitarEscribiendo();
@@ -140,7 +181,7 @@ export class ChatPage implements OnInit {
     });
   }
 
-  private async enviarTicketDeVerificacion(estudiante: Estudiante): Promise<void> {
+  private async enviarTicketDeVerificacion(usuario: Usuario): Promise<void> {
     this.estado = 'enviando_ticket';
 
     if (!(await this.requiereConexion())) {
@@ -149,7 +190,7 @@ export class ChatPage implements OnInit {
     }
 
     this.mostrarEscribiendo();
-    this.estudianteService.enviarTicketVerificacion(estudiante.cedula).subscribe({
+    this.estudianteService.enviarTicketVerificacion(usuario.cedula).subscribe({
       next: async resultado => {
         this.quitarEscribiendo();
         await this.hablar(
@@ -174,14 +215,14 @@ export class ChatPage implements OnInit {
   }
 
   async verificarTicketIngresado(): Promise<void> {
-    if (!this.puedeVerificarTicket || !this.estudianteActual) {
+    if (!this.puedeVerificarTicket || !this.usuarioActual) {
       this.errorTicket = `Ingresa el ticket de ${LONGITUD_TICKET_VERIFICACION} dígitos que enviamos a tu correo.`;
       return;
     }
     this.errorTicket = '';
 
     const ticket = this.ticketIngresado;
-    const estudiante = this.estudianteActual;
+    const usuario = this.usuarioActual;
     this.agregarMensaje({ tipo: 'usuario-texto', texto: ticket });
     this.ticketIngresado = '';
     this.estado = 'validando_ticket';
@@ -192,7 +233,7 @@ export class ChatPage implements OnInit {
     }
 
     this.mostrarEscribiendo();
-    this.estudianteService.verificarTicket(estudiante.cedula, ticket).subscribe({
+    this.estudianteService.verificarTicket(usuario.cedula, ticket).subscribe({
       next: async valido => {
         this.quitarEscribiendo();
         if (!valido) {
@@ -201,7 +242,7 @@ export class ChatPage implements OnInit {
           return;
         }
 
-        await this.hablar(`¡Identidad verificada! ✅ Hola ${estudiante.nombres} ${estudiante.apellidos}, ¿qué deseas consultar hoy?`);
+        await this.hablar(`¡Identidad verificada! ✅ Hola ${this.nombreVisible(usuario)}, ¿qué deseas consultar hoy?`);
         this.agregarMensaje({ tipo: 'bot-opciones' });
         this.estado = 'menu';
       },
@@ -214,7 +255,7 @@ export class ChatPage implements OnInit {
   }
 
   async seleccionarOpcion(opcion: OpcionChat): Promise<void> {
-    if (this.estado !== 'menu' || !this.estudianteActual) {
+    if (this.estado !== 'menu' || !this.usuarioActual) {
       return;
     }
 
@@ -226,15 +267,27 @@ export class ChatPage implements OnInit {
       return;
     }
 
-    if (opcion.id === 'CERTIFICADO_MATRICULA') {
+    const usuario = this.usuarioActual;
+
+    if (opcion.id === 'CERTIFICADO_MATRICULA' && this.esEstudiante(usuario)) {
       await this.hablar('Estos son tus datos. Verifícalos antes de generar tu certificado:');
-      this.agregarMensaje({ tipo: 'bot-preview-certificado', estudiante: this.estudianteActual });
+      this.agregarMensaje({ tipo: 'bot-preview-certificado', estudiante: usuario });
       this.estado = 'preview_certificado';
       return;
     }
 
-    if (opcion.id === 'ESTADO_TICKETS') {
-      await this.consultarEstadoTickets(this.estudianteActual);
+    if (opcion.id === 'ANULACION_MATRICULA' && this.esEstudiante(usuario)) {
+      await this.iniciarAnulacionMatricula(usuario);
+      return;
+    }
+
+    if (opcion.id === 'ESTADO_TICKETS' && this.esEstudiante(usuario)) {
+      await this.consultarEstadoTickets(usuario);
+      return;
+    }
+
+    if (opcion.id === 'REPORTAR_INCIDENCIA_LAB') {
+      await this.iniciarReporteIncidencia();
       return;
     }
 
@@ -242,6 +295,72 @@ export class ChatPage implements OnInit {
       await this.finalizarConversacion();
       return;
     }
+  }
+
+  private esEstudiante(usuario: Usuario): usuario is Estudiante {
+    return usuario.tipoUsuario === 'ESTUDIANTE';
+  }
+
+  private nombreVisible(usuario: Usuario): string {
+    return this.esEstudiante(usuario) ? `${usuario.nombres} ${usuario.apellidos}`.trim() : usuario.nombres;
+  }
+
+  private async iniciarAnulacionMatricula(estudiante: Estudiante): Promise<void> {
+    await this.hablar(
+      `⚠️ Estás solicitando la anulación de tu matrícula del periodo ${estudiante.periodoActual}. ` +
+      `Esta acción implica la cancelación de tu inscripción en todos los cursos del periodo actual.`
+    );
+    await this.hablar('Por favor confirma los datos de tu solicitud antes de continuar:');
+    this.agregarMensaje({ tipo: 'bot-confirmacion-anulacion', estudiante });
+    this.estado = 'confirmando_anulacion';
+  }
+
+  async confirmarAnulacion(): Promise<void> {
+    if (this.estado !== 'confirmando_anulacion' || !this.usuarioActual) {
+      return;
+    }
+
+    this.agregarMensaje({ tipo: 'usuario-texto', texto: 'Confirmar solicitud de anulación' });
+    this.estado = 'procesando_anulacion';
+
+    if (!(await this.requiereConexion())) {
+      this.estado = 'confirmando_anulacion';
+      return;
+    }
+
+    this.mostrarEscribiendo();
+    this.estudianteService.crearTicketSolicitud(this.usuarioActual.cedula, 'ANULACION_MATRICULA').subscribe({
+      next: async ticket => {
+        this.quitarEscribiendo();
+        await this.hablar(
+          `✅ Tu solicitud de anulación ha sido registrada exitosamente con el número de ticket ` +
+          `<strong>${ticket.id}</strong>.`
+        );
+        await this.hablar(
+          `📧 Recibirás una confirmación en tu correo institucional ` +
+          `(${this.usuarioActual?.correoInstitucional}). ` +
+          `El personal de Secretaría procesará tu solicitud en un plazo de 3 a 5 días hábiles.`
+        );
+        await this.hablar('Puedes consultar el estado de tu solicitud en cualquier momento desde "Consultar estado de mis tickets". ¿Deseas hacer algo más?');
+        this.agregarMensaje({ tipo: 'bot-opciones' });
+        this.estado = 'menu';
+      },
+      error: async () => {
+        this.quitarEscribiendo();
+        await this.hablar('No pude registrar tu solicitud en este momento. Intenta nuevamente en unos segundos.');
+        this.estado = 'confirmando_anulacion';
+      }
+    });
+  }
+
+  async cancelarAnulacion(): Promise<void> {
+    if (this.estado !== 'confirmando_anulacion') {
+      return;
+    }
+    this.agregarMensaje({ tipo: 'usuario-texto', texto: 'Cancelar' });
+    await this.hablar('Solicitud cancelada. ¿En qué más puedo ayudarte?');
+    this.agregarMensaje({ tipo: 'bot-opciones' });
+    this.estado = 'menu';
   }
 
   private async consultarEstadoTickets(estudiante: Estudiante): Promise<void> {
@@ -280,7 +399,7 @@ export class ChatPage implements OnInit {
   }
 
   async generarCertificado(): Promise<void> {
-    if (this.estado !== 'preview_certificado' || !this.estudianteActual) {
+    if (this.estado !== 'preview_certificado' || !this.usuarioActual) {
       return;
     }
 
@@ -294,7 +413,7 @@ export class ChatPage implements OnInit {
 
     this.mostrarEscribiendo();
 
-    this.estudianteService.generarCertificadoMatricula(this.estudianteActual.cedula).subscribe({
+    this.estudianteService.generarCertificadoMatricula(this.usuarioActual.cedula).subscribe({
       next: async certificado => {
         this.quitarEscribiendo();
         const qrDataUrl = await QRCode.toDataURL(certificado.urlVerificacion, {
@@ -302,8 +421,24 @@ export class ChatPage implements OnInit {
           width: 260
         });
 
-        await this.hablar('¡Listo! Aquí tienes tu certificado de matrícula con su código QR único:');
+        await this.hablar('¡Listo! Tu certificado de matrícula ha sido generado exitosamente. 🎓');
         this.agregarMensaje({ tipo: 'bot-resultado-certificado', certificado, qrDataUrl });
+
+        try {
+          const pdfBlob = await this.certificadoPdfService.generarPdf(certificado, qrDataUrl);
+          const pdfBase64 = await this.blobABase64(pdfBlob);
+          await firstValueFrom(
+            this.estudianteService.enviarCertificadoPdf(certificado.cedula, certificado.codigoUnico, pdfBase64)
+          );
+          await this.hablar(
+            `📧 El certificado en formato PDF ha sido enviado a tu correo institucional ` +
+            `(${this.usuarioActual?.correoInstitucional ?? 'correo institucional'}). ` +
+            `Revisa tu bandeja de entrada.`
+          );
+        } catch {
+          await this.hablar('⚠️ Generé tu certificado, pero no pude enviarlo por correo en este momento. Puedes intentarlo nuevamente más tarde.');
+        }
+
         await this.hablar('Este QR es único e irrepetible: podrá verificarse en el sistema web con este mismo código. ¿Deseas algo más?');
         this.estado = 'resultado';
       },
@@ -315,54 +450,181 @@ export class ChatPage implements OnInit {
     });
   }
 
-  async compartirCertificado(mensaje: ChatMensaje): Promise<void> {
-    if (!mensaje.certificado || !mensaje.qrDataUrl) {
-      return;
-    }
-    const { certificado, qrDataUrl } = mensaje;
-    const nombreArchivo = `certificado-${certificado.codigoUnico}.png`;
-    const textoCompartir =
-      `Certificado de matrícula\n${certificado.nombreCompleto}\n` +
-      `Código: ${certificado.codigoUnico}\nVerifícalo en: ${certificado.urlVerificacion}`;
-
-    if (!Capacitor.isNativePlatform()) {
-      this.descargarEnNavegador(qrDataUrl, nombreArchivo);
-      return;
-    }
-
-    try {
-      const base64 = qrDataUrl.split(',')[1];
-      const archivo = await Filesystem.writeFile({
-        path: nombreArchivo,
-        data: base64,
-        directory: Directory.Cache
-      });
-
-      await Share.share({
-        title: 'Certificado de matrícula',
-        text: textoCompartir,
-        files: [archivo.uri],
-        dialogTitle: 'Compartir certificado de matrícula'
-      });
-    } catch (error) {
-      // El usuario pudo simplemente cancelar el cuadro de compartir.
-      console.warn('No se compartió el certificado', error);
-    }
+  private blobABase64(blob: Blob): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const lector = new FileReader();
+      lector.onloadend = () => {
+        const resultado = lector.result as string;
+        resolve(resultado.split(',')[1]);
+      };
+      lector.onerror = () => reject(lector.error);
+      lector.readAsDataURL(blob);
+    });
   }
 
-  private descargarEnNavegador(qrDataUrl: string, nombreArchivo: string): void {
-    const enlace = document.createElement('a');
-    enlace.href = qrDataUrl;
-    enlace.download = nombreArchivo;
-    enlace.click();
+  // ── Rol Docente: reportar incidencia de laboratorio ──────────────────────
+
+  private async iniciarReporteIncidencia(): Promise<void> {
+    this.estado = 'seleccionando_laboratorio';
+
+    if (!(await this.requiereConexion())) {
+      this.agregarMensaje({ tipo: 'bot-opciones' });
+      this.estado = 'menu';
+      return;
+    }
+
+    this.mostrarEscribiendo();
+    this.estudianteService.consultarLaboratorios().subscribe({
+      next: async laboratorios => {
+        this.quitarEscribiendo();
+        await this.hablar('¿En qué laboratorio ocurrió la incidencia?');
+        this.agregarMensaje({ tipo: 'bot-laboratorios', laboratorios });
+      },
+      error: async () => {
+        this.quitarEscribiendo();
+        await this.hablar('No pude cargar la lista de laboratorios. Intenta nuevamente en unos segundos.');
+        this.agregarMensaje({ tipo: 'bot-opciones' });
+        this.estado = 'menu';
+      }
+    });
   }
+
+  async seleccionarLaboratorio(laboratorio: Laboratorio): Promise<void> {
+    if (this.estado !== 'seleccionando_laboratorio') {
+      return;
+    }
+    this.agregarMensaje({ tipo: 'usuario-texto', texto: laboratorio.nombre });
+    this.laboratorioSeleccionado = laboratorio;
+    await this.hablar('Describe brevemente qué ocurrió (equipo afectado, hora aproximada, etc.):');
+    this.estado = 'escribiendo_incidencia';
+  }
+
+  get puedeEnviarDescripcionIncidencia(): boolean {
+    return this.descripcionIncidencia.trim().length >= 10 && this.estado === 'escribiendo_incidencia';
+  }
+
+  async enviarDescripcionIncidencia(): Promise<void> {
+    if (!this.puedeEnviarDescripcionIncidencia || !this.laboratorioSeleccionado) {
+      return;
+    }
+    const descripcion = this.descripcionIncidencia.trim();
+    this.descripcionPendiente = descripcion;
+    this.descripcionIncidencia = '';
+    this.agregarMensaje({ tipo: 'usuario-texto', texto: descripcion });
+
+    await this.hablar('¿Quieres adjuntar una foto de la incidencia? Es opcional.');
+    this.errorFoto = '';
+    this.estado = 'adjuntando_foto';
+  }
+
+  async onFotoSeleccionada(event: Event): Promise<void> {
+    if (this.estado !== 'adjuntando_foto') {
+      return;
+    }
+    const input = event.target as HTMLInputElement;
+    const archivo = input.files?.[0];
+    input.value = '';
+    if (!archivo) {
+      return;
+    }
+
+    if (archivo.type !== 'image/jpeg' && archivo.type !== 'image/png') {
+      this.errorFoto = 'Solo se aceptan fotos en formato JPG o PNG.';
+      return;
+    }
+    if (archivo.size > 5 * 1024 * 1024) {
+      this.errorFoto = 'La foto no puede pesar más de 5MB.';
+      return;
+    }
+    this.errorFoto = '';
+
+    const base64 = await this.blobABase64(archivo);
+    this.fotoSeleccionada = { base64, mime: archivo.type, previewUrl: `data:${archivo.type};base64,${base64}` };
+    this.agregarMensaje({ tipo: 'usuario-texto', texto: '📷 Foto adjuntada' });
+    await this.mostrarConfirmacionIncidencia();
+  }
+
+  async continuarSinFoto(): Promise<void> {
+    if (this.estado !== 'adjuntando_foto') {
+      return;
+    }
+    this.agregarMensaje({ tipo: 'usuario-texto', texto: 'Continuar sin foto' });
+    await this.mostrarConfirmacionIncidencia();
+  }
+
+  private async mostrarConfirmacionIncidencia(): Promise<void> {
+    if (!this.laboratorioSeleccionado) {
+      return;
+    }
+    await this.hablar('Revisa los datos antes de enviar el reporte:');
+    this.agregarMensaje({
+      tipo: 'bot-confirmacion-incidencia',
+      laboratorioSeleccionado: this.laboratorioSeleccionado,
+      descripcionIncidencia: this.descripcionPendiente,
+      fotoPreviewUrl: this.fotoSeleccionada?.previewUrl
+    });
+    this.estado = 'confirmando_incidencia';
+  }
+
+  async confirmarReporteIncidencia(): Promise<void> {
+    if (this.estado !== 'confirmando_incidencia' || !this.usuarioActual || !this.laboratorioSeleccionado) {
+      return;
+    }
+
+    this.agregarMensaje({ tipo: 'usuario-texto', texto: 'Confirmar reporte' });
+    this.estado = 'reportando_incidencia';
+
+    if (!(await this.requiereConexion())) {
+      this.estado = 'confirmando_incidencia';
+      return;
+    }
+
+    this.mostrarEscribiendo();
+    const foto = this.fotoSeleccionada ? { base64: this.fotoSeleccionada.base64, mime: this.fotoSeleccionada.mime } : undefined;
+    this.estudianteService
+      .reportarIncidenciaLaboratorio(this.usuarioActual.cedula, this.laboratorioSeleccionado.codigo, this.descripcionPendiente, foto)
+      .subscribe({
+        next: async incidencia => {
+          this.quitarEscribiendo();
+          this.laboratorioSeleccionado = null;
+          this.fotoSeleccionada = null;
+          this.descripcionPendiente = '';
+          await this.hablar('✅ Tu reporte fue registrado correctamente.');
+          this.agregarMensaje({ tipo: 'bot-resultado-incidencia', incidencia });
+          await this.hablar('El equipo de laboratorios revisará la incidencia. ¿Deseas hacer algo más?');
+          this.agregarMensaje({ tipo: 'bot-opciones' });
+          this.estado = 'menu';
+        },
+        error: async () => {
+          this.quitarEscribiendo();
+          await this.hablar('No pude registrar tu reporte en este momento. Intenta nuevamente en unos segundos.');
+          this.estado = 'confirmando_incidencia';
+        }
+      });
+  }
+
+  async cancelarReporteIncidencia(): Promise<void> {
+    if (this.estado !== 'confirmando_incidencia') {
+      return;
+    }
+    this.agregarMensaje({ tipo: 'usuario-texto', texto: 'Cancelar' });
+    this.laboratorioSeleccionado = null;
+    this.descripcionPendiente = '';
+    this.fotoSeleccionada = null;
+    this.errorFoto = '';
+    await this.hablar('Reporte cancelado. ¿En qué más puedo ayudarte?');
+    this.agregarMensaje({ tipo: 'bot-opciones' });
+    this.estado = 'menu';
+  }
+
+  // ── Comunes ────────────────────────────────────────────────────────────
 
   nuevaConsulta(): void {
     this.iniciarConversacion();
   }
 
   volverAlMenu(): void {
-    if (!this.estudianteActual) {
+    if (!this.usuarioActual) {
       return;
     }
     this.agregarMensaje({ tipo: 'bot-opciones' });

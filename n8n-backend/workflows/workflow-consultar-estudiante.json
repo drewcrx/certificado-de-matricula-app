@@ -3,43 +3,110 @@
   "nodes": [
     {
       "parameters": {
-        "content": "## Consultar estudiante por cédula\n- Reemplaza el nodo Postgres por el motor real (MySQL, SQL Server, etc.) si no usan Postgres.\n- Ajusta nombres de tabla/columnas a los reales.\n- Configura las credenciales de la base de datos en el nodo de consulta.\n- Ver CONTRATO-API.md para el detalle de request/response esperado por la app.",
-        "height": 220,
-        "width": 320
+        "content": "## Consultar estudiante o docente por cédula (esquema REAL)\n- Primero busca en `estudiantes`. Si no hay match, busca en `docentes` (segunda identidad, misma cédula/OTP).\n- La respuesta incluye `tipoUsuario: 'ESTUDIANTE' | 'DOCENTE'` — la app usa este campo para decidir qué menú mostrar (el flujo de cédula+OTP es idéntico para ambos, no hay pantalla de login separada).\n- estudiantes.correo (no correo_institucional). estudiantes.nombres trae el nombre completo; no hay columna apellidos separada, se devuelve '' para no romper el contrato.\n- carrera se obtiene por JOIN a carreras (carrera_id). periodoActual viene de periodos_academicos WHERE vigente = true.\n- Los docentes no tienen carrera/nivel/periodo/estadoMatricula — esos campos van null en su respuesta.\n- Query parametrizada ($1) — NUNCA concatenar el input del usuario en el SQL.\n- Incluye manejo de preflight CORS (OPTIONS) para que el navegador no bloquee el POST real.",
+        "height": 300,
+        "width": 380
       },
       "id": "a1111111-1111-4111-8111-111111111111",
       "name": "Nota",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
-      "position": [-200, 0]
+      "position": [
+        -200,
+        -140
+      ]
     },
     {
       "parameters": {
         "httpMethod": "POST",
         "path": "consultar-estudiante",
         "responseMode": "responseNode",
-        "options": {}
+        "options": {},
+        "authentication": "headerAuth"
       },
       "id": "a2222222-2222-4222-8222-222222222222",
       "name": "Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [200, 0],
-      "webhookId": "consultar-estudiante"
+      "position": [
+        200,
+        0
+      ],
+      "webhookId": "consultar-estudiante",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REEMPLAZAR",
+          "name": "REEMPLAZAR con credencial Header Auth (X-Api-Key)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "OPTIONS",
+        "path": "consultar-estudiante",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "a7777777-7777-4777-8777-777777777777",
+      "name": "Webhook (OPTIONS)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        200,
+        300
+      ],
+      "webhookId": "consultar-estudiante-options"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "",
+        "options": {
+          "responseCode": 204,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              },
+              {
+                "name": "Access-Control-Allow-Methods",
+                "value": "POST, OPTIONS"
+              },
+              {
+                "name": "Access-Control-Allow-Headers",
+                "value": "Content-Type, X-Api-Key"
+              }
+            ]
+          }
+        }
+      },
+      "id": "a8888888-8888-4888-8888-888888888888",
+      "name": "Responder: CORS preflight",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        460,
+        300
+      ]
     },
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT cedula, nombres, apellidos, carrera, nivel, periodo_actual AS \"periodoActual\", estado_matricula AS \"estadoMatricula\" FROM estudiantes WHERE cedula = $1",
-        "additionalFields": {
-          "queryParams": "={{ $json.body.cedula }}"
+        "resource": "database",
+        "query": "SELECT e.cedula, e.nombres, e.correo AS \"correoInstitucional\", c.nombre AS carrera, e.nivel, e.estado_matricula AS \"estadoMatricula\", p.nombre AS \"periodoActual\" FROM estudiantes e JOIN carreras c ON c.id = e.carrera_id LEFT JOIN periodos_academicos p ON p.vigente = true WHERE e.cedula = $1",
+        "options": {
+          "queryReplacement": "={{ [ $json.body.cedula ] }}"
         }
       },
       "id": "a3333333-3333-4333-8333-333333333333",
       "name": "Buscar Estudiante (Postgres)",
       "type": "n8n-nodes-base.postgres",
-      "typeVersion": 1,
-      "position": [460, 0],
+      "typeVersion": 2.6,
+      "position": [
+        460,
+        0
+      ],
       "alwaysOutputData": true,
       "credentials": {
         "postgres": {
@@ -75,35 +142,142 @@
       "name": "¿Existe el estudiante?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [720, 0]
+      "position": [
+        720,
+        0
+      ]
     },
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ {\n  \"cedula\": $json.cedula,\n  \"nombres\": $json.nombres,\n  \"apellidos\": $json.apellidos,\n  \"carrera\": $json.carrera,\n  \"nivel\": $json.nivel,\n  \"periodoActual\": $json.periodoActual,\n  \"estadoMatricula\": $json.estadoMatricula\n} }}",
+        "responseBody": "={{ {\n  \"tipoUsuario\": \"ESTUDIANTE\",\n  \"cedula\": $json.cedula,\n  \"nombres\": $json.nombres,\n  \"apellidos\": \"\",\n  \"correoInstitucional\": $json.correoInstitucional,\n  \"carrera\": $json.carrera,\n  \"nivel\": $json.nivel,\n  \"periodoActual\": $json.periodoActual,\n  \"estadoMatricula\": $json.estadoMatricula\n} }}",
         "options": {
-          "responseCode": 200
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
         }
       },
       "id": "a5555555-5555-4555-8555-555555555555",
       "name": "Responder: Encontrado",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [980, -100]
+      "position": [
+        980,
+        -220
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "resource": "database",
+        "query": "SELECT cedula, nombre_docente AS nombres, correo AS \"correoInstitucional\" FROM docentes WHERE cedula = $1",
+        "options": {
+          "queryReplacement": "={{ [ $('Webhook').item.json.body.cedula ] }}"
+        }
+      },
+      "id": "a9999999-9999-4999-8999-999999999999",
+      "name": "Buscar Docente (Postgres)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        980,
+        60
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "REEMPLAZAR",
+          "name": "REEMPLAZAR con credenciales reales"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "cond1",
+              "leftValue": "={{ $json.cedula }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "aaaaaaa1-aaaa-4aaa-8aaa-aaaaaaaaaaa1",
+      "name": "¿Existe el docente?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1240,
+        60
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {\n  \"tipoUsuario\": \"DOCENTE\",\n  \"cedula\": $json.cedula,\n  \"nombres\": $json.nombres,\n  \"apellidos\": \"\",\n  \"correoInstitucional\": $json.correoInstitucional,\n  \"carrera\": null,\n  \"nivel\": null,\n  \"periodoActual\": null,\n  \"estadoMatricula\": null\n} }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "aaaaaaa2-aaaa-4aaa-8aaa-aaaaaaaaaaa2",
+      "name": "Responder: Encontrado Docente",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1500,
+        -20
+      ]
     },
     {
       "parameters": {
         "respondWith": "json",
         "responseBody": "={{ null }}",
         "options": {
-          "responseCode": 200
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
         }
       },
       "id": "a6666666-6666-4666-8666-666666666666",
       "name": "Responder: No encontrado",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [980, 120]
+      "position": [
+        1500,
+        160
+      ]
     }
   ],
   "connections": {
@@ -112,6 +286,17 @@
         [
           {
             "node": "Buscar Estudiante (Postgres)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook (OPTIONS)": {
+      "main": [
+        [
+          {
+            "node": "Responder: CORS preflight",
             "type": "main",
             "index": 0
           }
@@ -140,6 +325,35 @@
         ],
         [
           {
+            "node": "Buscar Docente (Postgres)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Docente (Postgres)": {
+      "main": [
+        [
+          {
+            "node": "¿Existe el docente?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Existe el docente?": {
+      "main": [
+        [
+          {
+            "node": "Responder: Encontrado Docente",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
             "node": "Responder: No encontrado",
             "type": "main",
             "index": 0
@@ -151,5 +365,6 @@
   "pinData": {},
   "settings": {
     "executionOrder": "v1"
-  }
+  },
+  "active": true
 }

@@ -1,0 +1,827 @@
+{
+  "name": "App Matrícula - Reportar Incidencia de Laboratorio",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Reportar incidencia de laboratorio (esquema REAL — rol Docente)\n- Solo para docentes: valida que la cédula exista en `docentes` Y tenga una cuenta correspondiente en `usuarios_panel` con rol PROFESOR (así funciona el sistema real — cada docente importado tiene ambas filas). Si falta cualquiera de las dos, responde 404.\n- `alertas.profesor_id` es el id de `usuarios_panel`, NO el id de `docentes` — se resuelve cruzando por cédula.\n- responsable_id se resuelve vía `asignaciones_responsables` (tipo ALERTA_LAB, sin filtro de carrera — las alertas no son por carrera).\n- codigo ('AL-000001') se genera DESPUÉS del insert a partir del id real, igual que en tickets — por eso `alertas.codigo` es nullable.\n- Se registra en `alerta_historial` (estado_anterior NULL → 'Pendiente') y en `eventos` ('AlertaCreada'), igual que el patrón real.\n- Notifica por correo al responsable de laboratorios (rama en paralelo, onError=continueRegularOutput — un fallo de correo no debe romper el reporte ya guardado).\n- FOTO (opcional): si el body trae `fotoBase64`, se decodifica y se guarda en disco (`/data/storage/uploads/`, volumen `uploads_data` — ver docker-compose.yml), se inserta en `adjuntos` y se vincula en `alertas.adjunto_id`. Igual que en `certificado-pdf`, esto NO usa `$json` genérico entre ramas — cada rama (con/sin foto) normaliza a `{ adjuntoId }` antes de converger en \"Insertar Alerta\", para evitar el bug de referencias implícitas que ya salió 2 veces en este proyecto.\n- Incluye manejo de preflight CORS (OPTIONS).",
+        "height": 480,
+        "width": 460
+      },
+      "id": "i1111111-1111-4111-8111-111111111111",
+      "name": "Nota",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -280,
+        -260
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "reportar-incidencia-laboratorio",
+        "responseMode": "responseNode",
+        "options": {},
+        "authentication": "headerAuth"
+      },
+      "id": "i2222222-2222-4222-8222-222222222222",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        200,
+        0
+      ],
+      "webhookId": "reportar-incidencia-laboratorio",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REEMPLAZAR",
+          "name": "REEMPLAZAR con credencial Header Auth (X-Api-Key)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "OPTIONS",
+        "path": "reportar-incidencia-laboratorio",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "i3333333-3333-4333-8333-333333333333",
+      "name": "Webhook (OPTIONS)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        200,
+        500
+      ],
+      "webhookId": "reportar-incidencia-laboratorio-options"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "",
+        "options": {
+          "responseCode": 204,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              },
+              {
+                "name": "Access-Control-Allow-Methods",
+                "value": "POST, OPTIONS"
+              },
+              {
+                "name": "Access-Control-Allow-Headers",
+                "value": "Content-Type, X-Api-Key"
+              }
+            ]
+          }
+        }
+      },
+      "id": "i4444444-4444-4444-8444-444444444444",
+      "name": "Responder: CORS preflight",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        460,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "resource": "database",
+        "query": "SELECT d.cedula, d.nombre_docente AS \"nombreDocente\", up.id AS \"profesorId\" FROM docentes d JOIN usuarios_panel up ON up.cedula = d.cedula JOIN roles r ON r.id = up.rol_id AND r.codigo = 'PROFESOR' WHERE d.cedula = $1",
+        "options": {
+          "queryReplacement": "={{ [ $json.body.cedula ] }}"
+        }
+      },
+      "id": "i5555555-5555-4555-8555-555555555555",
+      "name": "Buscar Docente Válido (Postgres)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        460,
+        0
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "REEMPLAZAR",
+          "name": "REEMPLAZAR con credenciales reales"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "cond1",
+              "leftValue": "={{ $json.profesorId }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "i6666666-6666-4666-8666-666666666666",
+      "name": "¿Es docente válido?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        720,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "resource": "database",
+        "query": "SELECT id FROM laboratorios WHERE codigo = $1",
+        "options": {
+          "queryReplacement": "={{ [ $('Webhook').item.json.body.laboratorioCodigo ] }}"
+        }
+      },
+      "id": "i7777777-7777-4777-8777-777777777777",
+      "name": "Buscar Laboratorio (Postgres)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        980,
+        -180
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "REEMPLAZAR",
+          "name": "REEMPLAZAR con credenciales reales"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "cond1",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "i8888888-8888-4888-8888-888888888888",
+      "name": "¿Laboratorio válido?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1240,
+        -180
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "resource": "database",
+        "query": "SELECT up.id AS \"responsableId\", up.correo AS \"correoResponsable\", up.nombres AS \"nombreResponsable\" FROM asignaciones_responsables ar JOIN usuarios_panel up ON up.id = ar.usuario_id JOIN tipos_solicitud ts ON ts.id = ar.tipo_solicitud_id AND ts.codigo = 'ALERTA_LAB' WHERE ar.vigente = true LIMIT 1",
+        "options": {}
+      },
+      "id": "i9999999-9999-4999-8999-999999999999",
+      "name": "Buscar Responsable (Postgres)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1500,
+        -180
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "REEMPLAZAR",
+          "name": "REEMPLAZAR con credenciales reales"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "cond1",
+              "leftValue": "={{ $('Webhook').item.json.body.fotoBase64 }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "ihhhhhh1-hhhh-4hhh-8hhh-hhhhhhhhhhh1",
+      "name": "¿Tiene foto adjunta?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        -180
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $('Webhook').item.json.body;\nconst mime = (body.fotoMime === 'image/png') ? 'image/png' : 'image/jpeg';\nconst extension = mime === 'image/png' ? 'png' : 'jpg';\nconst nombreArchivo = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}.${extension}`;\nconst tamanoBytes = Buffer.from(body.fotoBase64, 'base64').length;\n\nreturn [{\n  json: { nombreArchivo, mime, tamanoBytes },\n  binary: {\n    data: {\n      data: body.fotoBase64,\n      mimeType: mime,\n      fileName: nombreArchivo\n    }\n  }\n}];"
+      },
+      "id": "ihhhhhh2-hhhh-4hhh-8hhh-hhhhhhhhhhh2",
+      "name": "Preparar Foto (Binario)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2020,
+        -420
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "={{ \"/data/storage/uploads/\" + $json.nombreArchivo }}",
+        "dataPropertyName": "data",
+        "options": {}
+      },
+      "id": "ihhhhhh3-hhhh-4hhh-8hhh-hhhhhhhhhhh3",
+      "name": "Escribir Foto en Disco",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        2280,
+        -420
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "resource": "database",
+        "query": "INSERT INTO adjuntos (tipo, ruta, mime, tamano_bytes) VALUES ('foto_alerta', $1, $2, $3) RETURNING id",
+        "options": {
+          "queryReplacement": "={{ [ \"storage/uploads/\" + $('Preparar Foto (Binario)').item.json.nombreArchivo, $('Preparar Foto (Binario)').item.json.mime, $('Preparar Foto (Binario)').item.json.tamanoBytes ] }}"
+        }
+      },
+      "id": "ihhhhhh4-hhhh-4hhh-8hhh-hhhhhhhhhhh4",
+      "name": "Insertar Adjunto (Postgres)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2540,
+        -420
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "REEMPLAZAR",
+          "name": "REEMPLAZAR con credenciales reales"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { adjuntoId: $json.id } }];"
+      },
+      "id": "ihhhhhh5-hhhh-4hhh-8hhh-hhhhhhhhhhh5",
+      "name": "Foto Guardada",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2800,
+        -420
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { adjuntoId: null } }];"
+      },
+      "id": "ihhhhhh6-hhhh-4hhh-8hhh-hhhhhhhhhhh6",
+      "name": "Sin Foto",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2020,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "resource": "database",
+        "query": "INSERT INTO alertas (laboratorio_id, descripcion, profesor_id, responsable_id, adjunto_id) VALUES ($1, $2, $3, $4, $5) RETURNING id, creado_en",
+        "options": {
+          "queryReplacement": "={{ [$('Buscar Laboratorio (Postgres)').item.json.id, $('Webhook').item.json.body.descripcion, $('Buscar Docente Válido (Postgres)').item.json.profesorId, $('Buscar Responsable (Postgres)').item.json.responsableId ?? null, $json.adjuntoId] }}"
+        }
+      },
+      "id": "iaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      "name": "Insertar Alerta (Postgres)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        3060,
+        -180
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "REEMPLAZAR",
+          "name": "REEMPLAZAR con credenciales reales"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "resource": "database",
+        "query": "UPDATE alertas SET codigo = 'AL-' || LPAD(id::text, 6, '0') WHERE id = $1 RETURNING id, codigo, creado_en",
+        "options": {
+          "queryReplacement": "={{ [ $json.id ] }}"
+        }
+      },
+      "id": "ibbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      "name": "Generar Código (Postgres)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        3320,
+        -180
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "REEMPLAZAR",
+          "name": "REEMPLAZAR con credenciales reales"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "resource": "database",
+        "query": "INSERT INTO alerta_historial (alerta_id, estado_anterior, estado_nuevo, usuario_id) VALUES ($1, NULL, 'Pendiente', $2)",
+        "options": {
+          "queryReplacement": "={{ [$json.id, $('Buscar Docente Válido (Postgres)').item.json.profesorId] }}"
+        }
+      },
+      "id": "icccccc1-cccc-4ccc-8ccc-ccccccccccc1",
+      "name": "Registrar Historial (Postgres)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        3580,
+        -180
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "REEMPLAZAR",
+          "name": "REEMPLAZAR con credenciales reales"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "resource": "database",
+        "query": "INSERT INTO eventos (tipo, payload, origen) VALUES ('AlertaCreada', $1::jsonb, 'chatbot')",
+        "options": {
+          "queryReplacement": "={{ [ JSON.stringify({ codigo: $('Generar Código (Postgres)').item.json.codigo, alerta_id: String($('Generar Código (Postgres)').item.json.id) }) ] }}"
+        }
+      },
+      "id": "icccccc2-cccc-4ccc-8ccc-ccccccccccc2",
+      "name": "Registrar Evento (Postgres)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        3840,
+        -180
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "REEMPLAZAR",
+          "name": "REEMPLAZAR con credenciales reales"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const alerta = $('Generar Código (Postgres)').item.json;\nconst fecha = new Date(alerta.creado_en);\nconst fechaReporte = fecha.toLocaleDateString('es-EC', {\n  year: 'numeric', month: 'long', day: '2-digit'\n});\n\nreturn [{\n  json: {\n    codigo: alerta.codigo,\n    laboratorio: $('Webhook').item.json.body.laboratorioCodigo,\n    descripcion: $('Webhook').item.json.body.descripcion,\n    estado: 'Pendiente',\n    fechaReporte,\n    tieneFoto: !!$('Webhook').item.json.body.fotoBase64,\n    correoResponsable: $('Buscar Responsable (Postgres)').item.json.correoResponsable ?? null,\n    nombreResponsable: $('Buscar Responsable (Postgres)').item.json.nombreResponsable ?? null,\n    nombreDocente: $('Buscar Docente Válido (Postgres)').item.json.nombreDocente\n  }\n}];"
+      },
+      "id": "idddddd1-dddd-4ddd-8ddd-ddddddddddd1",
+      "name": "Formatear Respuesta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4100,
+        -180
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "cond1",
+              "leftValue": "={{ $json.correoResponsable }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "idddddd2-dddd-4ddd-8ddd-ddddddddddd2",
+      "name": "¿Tiene responsable con correo?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        4360,
+        60
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "no-reply@yavirac.edu.ec",
+        "toEmail": "={{ $json.correoResponsable }}",
+        "subject": "=Nueva incidencia de laboratorio — {{ $json.codigo }}",
+        "emailFormat": "html",
+        "message": "=<div style=\"font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;\">\n  <div style=\"text-align: center; margin-bottom: 24px;\">\n    <h2 style=\"color: #1a237e; margin-top: 12px;\">Instituto Superior Tecnológico<br>de Turismo y Patrimonio \"YAVIRAC\"</h2>\n  </div>\n\n  <p>Estimado/a {{ $json.nombreResponsable }},</p>\n\n  <p>El/la docente <strong>{{ $json.nombreDocente }}</strong> reportó una nueva incidencia de laboratorio:</p>\n\n  <div style=\"background: #f5f5f5; border-left: 4px solid #1a237e; padding: 16px; margin: 20px 0; border-radius: 4px;\">\n    <p style=\"margin: 4px 0;\"><strong>Código:</strong> <code>{{ $json.codigo }}</code></p>\n    <p style=\"margin: 4px 0;\"><strong>Laboratorio:</strong> {{ $json.laboratorio }}</p>\n    <p style=\"margin: 4px 0;\"><strong>Descripción:</strong> {{ $json.descripcion }}</p>\n    <p style=\"margin: 4px 0;\"><strong>Fecha:</strong> {{ $json.fechaReporte }}</p>\n  </div>\n\n  <p>Ingresa al panel administrativo para gestionar esta incidencia.</p>\n\n  <hr style=\"border: none; border-top: 1px solid #ddd; margin: 24px 0;\" />\n\n  <p style=\"color: #666; font-size: 12px; text-align: center;\">\n    Este correo fue generado automáticamente por el sistema YaviBot.<br>\n    Instituto Superior Tecnológico de Turismo y Patrimonio \"YAVIRAC\" | www.yavirac.edu.ec\n  </p>\n</div>",
+        "options": {}
+      },
+      "id": "idddddd3-dddd-4ddd-8ddd-ddddddddddd3",
+      "name": "Enviar Aviso a Responsable (Correo)",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "onError": "continueRegularOutput",
+      "position": [
+        4620,
+        60
+      ],
+      "notes": "CONFIGURAR: credenciales SMTP. onError=continueRegularOutput: no debe afectar el reporte ya guardado si el correo falla.",
+      "credentials": {
+        "smtp": {
+          "id": "REEMPLAZAR",
+          "name": "REEMPLAZAR con credencial SMTP (Mailtrap en pruebas)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {\n  \"codigo\": $json.codigo,\n  \"laboratorio\": $json.laboratorio,\n  \"descripcion\": $json.descripcion,\n  \"estado\": $json.estado,\n  \"fechaReporte\": $json.fechaReporte,\n  \"tieneFoto\": $json.tieneFoto\n} }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "ieeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+      "name": "Responder: Reporte creado",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        4360,
+        -180
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"error\": \"Laboratorio no válido.\" } }}",
+        "options": {
+          "responseCode": 400,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "ifffffff-ffff-4fff-8fff-ffffffffffff",
+      "name": "Responder: Laboratorio inválido",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1500,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"error\": \"No se encontró un docente con esa cédula.\" } }}",
+        "options": {
+          "responseCode": 404,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "ig111111-1111-4111-8111-111111111111",
+      "name": "Responder: Docente no encontrado",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        980,
+        220
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Buscar Docente Válido (Postgres)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook (OPTIONS)": {
+      "main": [
+        [
+          {
+            "node": "Responder: CORS preflight",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Docente Válido (Postgres)": {
+      "main": [
+        [
+          {
+            "node": "¿Es docente válido?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Es docente válido?": {
+      "main": [
+        [
+          {
+            "node": "Buscar Laboratorio (Postgres)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder: Docente no encontrado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Laboratorio (Postgres)": {
+      "main": [
+        [
+          {
+            "node": "¿Laboratorio válido?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Laboratorio válido?": {
+      "main": [
+        [
+          {
+            "node": "Buscar Responsable (Postgres)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder: Laboratorio inválido",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Responsable (Postgres)": {
+      "main": [
+        [
+          {
+            "node": "¿Tiene foto adjunta?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Tiene foto adjunta?": {
+      "main": [
+        [
+          {
+            "node": "Preparar Foto (Binario)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Sin Foto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Foto (Binario)": {
+      "main": [
+        [
+          {
+            "node": "Escribir Foto en Disco",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Escribir Foto en Disco": {
+      "main": [
+        [
+          {
+            "node": "Insertar Adjunto (Postgres)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insertar Adjunto (Postgres)": {
+      "main": [
+        [
+          {
+            "node": "Foto Guardada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Foto Guardada": {
+      "main": [
+        [
+          {
+            "node": "Insertar Alerta (Postgres)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sin Foto": {
+      "main": [
+        [
+          {
+            "node": "Insertar Alerta (Postgres)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insertar Alerta (Postgres)": {
+      "main": [
+        [
+          {
+            "node": "Generar Código (Postgres)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generar Código (Postgres)": {
+      "main": [
+        [
+          {
+            "node": "Registrar Historial (Postgres)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Registrar Historial (Postgres)": {
+      "main": [
+        [
+          {
+            "node": "Registrar Evento (Postgres)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Registrar Evento (Postgres)": {
+      "main": [
+        [
+          {
+            "node": "Formatear Respuesta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formatear Respuesta": {
+      "main": [
+        [
+          {
+            "node": "¿Tiene responsable con correo?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Responder: Reporte creado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Tiene responsable con correo?": {
+      "main": [
+        [
+          {
+            "node": "Enviar Aviso a Responsable (Correo)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": true
+}

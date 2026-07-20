@@ -4,11 +4,9 @@
 
 export const environment = {
   production: false,
-  // Mientras el equipo de backend/n8n no entregue los webhooks reales,
-  // el servicio EstudianteService responde con datos simulados.
-  usarMock: true,
-  // URL base de n8n cuando esté disponible, ej: https://n8n.tudominio.com/webhook
-  n8nBaseUrl: 'https://TU-INSTANCIA-N8N.example.com/webhook'
+  usarMock: false,
+  n8nBaseUrl: 'http://localhost:5678/webhook',
+  apiKey: '3B787n4olMCjx37oCKFzHapwWQd88yfL'
 };
 
 /*

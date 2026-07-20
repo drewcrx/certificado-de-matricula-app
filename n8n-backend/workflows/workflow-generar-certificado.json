@@ -3,43 +3,110 @@
   "nodes": [
     {
       "parameters": {
-        "content": "## Generar certificado de matrícula\n- Valida que el estudiante exista Y esté MATRICULADO antes de generar el código.\n- IDEMPOTENCIA (requisito confirmado por la coordinación académica): antes de generar un código nuevo, se busca si ya existe un certificado para esa cédula+periodo. Si existe, se devuelve el mismo (mismo QR), sin importar si el trámite se inició desde la web o desde la app.\n- Es el único trámite 100% automatizado: además del certificado, crea su propio ticket_solicitud en estado COMPLETADO (para que aparezca en 'Consultar estado de mis tickets').\n- El nodo Code genera el código único del certificado (cámbialo por un UUID real en producción). El id del ticket se genera atómicamente en Postgres con nextval().\n- Ajusta el nodo Postgres al motor real de base de datos.",
-        "height": 320,
-        "width": 360
+        "content": "## Generar certificado de matrícula (esquema REAL)\n- Estudiante: JOIN a carreras (nombre) y a periodos_academicos DOS VECES (p = vigente=true para periodoActual, pi = periodo_ingreso_id del estudiante).\n- IDEMPOTENCIA: `certificados` tiene UNIQUE(estudiante_id, periodo_lectivo_codigo) (constraint ux_certificado_estudiante_periodo, agregado en esta instancia local). El workflow sigue haciendo el chequeo \"¿ya existe?\" antes de insertar para responder con el certificado existente en vez de un error, pero la BD también lo garantiza ante condiciones de carrera.\n- codigoUnico = qr_codigos.identificador (UUID real generado por gen_random_uuid(), con UNIQUE a nivel de BD).\n- El PDF real (con membrete oficial) se genera EN LA APP (certificado-pdf.service.ts, navegador) porque n8n no puede correr jsPDF/canvas. Este workflow solo crea el registro y devuelve los datos; la app genera el PDF y lo envía en base64 al workflow separado \"Enviar Certificado PDF por Correo\" (enviar-certificado-pdf), que es quien realmente adjunta y envía el correo.\n- firmante_nombre/cargo van como literales (vienen de configuracion_sistema en el dump real).\n- No se actualiza qr_codigos.certificado_id (back-link redundante) para mantener el workflow simple; certificados.qr_id ya es la relación autoritativa.\n- Incluye manejo de preflight CORS (OPTIONS).",
+        "height": 440,
+        "width": 420
       },
       "id": "b1111111-1111-4111-8111-111111111111",
       "name": "Nota",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
-      "position": [-260, -100]
+      "position": [
+        -280,
+        -260
+      ]
     },
     {
       "parameters": {
         "httpMethod": "POST",
         "path": "generar-certificado-matricula",
         "responseMode": "responseNode",
-        "options": {}
+        "options": {},
+        "authentication": "headerAuth"
       },
       "id": "b2222222-2222-4222-8222-222222222222",
       "name": "Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [200, 0],
-      "webhookId": "generar-certificado-matricula"
+      "position": [
+        200,
+        0
+      ],
+      "webhookId": "generar-certificado-matricula",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REEMPLAZAR",
+          "name": "REEMPLAZAR con credencial Header Auth (X-Api-Key)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "OPTIONS",
+        "path": "generar-certificado-matricula",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "bfffffff-ffff-4fff-8fff-ffffffffffff",
+      "name": "Webhook (OPTIONS)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        200,
+        400
+      ],
+      "webhookId": "generar-certificado-matricula-options"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "",
+        "options": {
+          "responseCode": 204,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              },
+              {
+                "name": "Access-Control-Allow-Methods",
+                "value": "POST, OPTIONS"
+              },
+              {
+                "name": "Access-Control-Allow-Headers",
+                "value": "Content-Type, X-Api-Key"
+              }
+            ]
+          }
+        }
+      },
+      "id": "bfffffff-ffff-4fff-8fff-fffffffffffe",
+      "name": "Responder: CORS preflight",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        460,
+        400
+      ]
     },
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT cedula, nombres, apellidos, carrera, nivel, periodo_actual AS \"periodoActual\", estado_matricula AS \"estadoMatricula\" FROM estudiantes WHERE cedula = $1",
-        "additionalFields": {
-          "queryParams": "={{ $json.body.cedula }}"
+        "resource": "database",
+        "query": "SELECT e.id AS estudiante_id, e.cedula, e.nombres, e.correo AS \"correoInstitucional\", c.nombre AS carrera, e.nivel, e.estado_matricula AS \"estadoMatricula\", e.modalidad, e.nivel_ingreso, p.codigo AS periodo_codigo, p.nombre AS \"periodoActual\", pi.codigo AS periodo_ingreso_codigo, pi.nombre AS periodo_ingreso_nombre FROM estudiantes e JOIN carreras c ON c.id = e.carrera_id LEFT JOIN periodos_academicos p ON p.vigente = true LEFT JOIN periodos_academicos pi ON pi.id = e.periodo_ingreso_id WHERE e.cedula = $1",
+        "options": {
+          "queryReplacement": "={{ [ $json.body.cedula ] }}"
         }
       },
       "id": "b3333333-3333-4333-8333-333333333333",
       "name": "Buscar Estudiante (Postgres)",
       "type": "n8n-nodes-base.postgres",
-      "typeVersion": 1,
-      "position": [460, 0],
+      "typeVersion": 2.6,
+      "position": [
+        460,
+        0
+      ],
       "alwaysOutputData": true,
       "credentials": {
         "postgres": {
@@ -75,21 +142,28 @@
       "name": "¿Está matriculado?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [720, 0]
+      "position": [
+        720,
+        0
+      ]
     },
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT codigo_unico AS \"codigoUnico\", cedula, nombre_completo AS \"nombreCompleto\", carrera, nivel, periodo_actual AS \"periodoActual\", fecha_emision AS \"fechaEmision\", url_verificacion AS \"urlVerificacion\" FROM certificados_matricula WHERE cedula = $1 AND periodo_actual = $2",
-        "additionalFields": {
-          "queryParams": "={{ [$json.cedula, $json.periodoActual] }}"
+        "resource": "database",
+        "query": "SELECT qc.identificador AS \"codigoUnico\", cert.fecha FROM certificados cert JOIN qr_codigos qc ON qc.id = cert.qr_id WHERE cert.estudiante_id = $1 AND cert.periodo_lectivo_codigo = $2 ORDER BY cert.creado_en DESC LIMIT 1",
+        "options": {
+          "queryReplacement": "={{ [$json.estudiante_id, $json.periodo_codigo] }}"
         }
       },
       "id": "b9999999-9999-4999-8999-999999999999",
       "name": "Buscar Certificado Existente (Postgres)",
       "type": "n8n-nodes-base.postgres",
-      "typeVersion": 1,
-      "position": [980, -260],
+      "typeVersion": 2.6,
+      "position": [
+        980,
+        -220
+      ],
       "alwaysOutputData": true,
       "credentials": {
         "postgres": {
@@ -125,99 +199,159 @@
       "name": "¿Ya existe certificado?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [1240, -260]
+      "position": [
+        1240,
+        -220
+      ]
     },
     {
       "parameters": {
-        "jsCode": "const anio = new Date().getFullYear();\nconst aleatorio = Math.random().toString(36).slice(2, 10).toUpperCase();\nconst codigoUnico = `MAT-${anio}-${aleatorio}`;\n// TODO produccion: reemplazar por UUID real. La unicidad real la garantiza\n// el UNIQUE(cedula, periodo_actual) de la tabla + el chequeo previo de\n// \"Buscar Certificado Existente\".\n\nconst nombreCompleto = `${$json.nombres} ${$json.apellidos}`;\nconst fechaEmision = new Date().toLocaleDateString('es-EC', {\n  year: 'numeric', month: 'long', day: '2-digit'\n});\nconst urlVerificacion = `https://verificacion.tudominio.edu.ec/certificados/${codigoUnico}`;\n\nreturn [{\n  json: {\n    ...$json,\n    codigoUnico,\n    nombreCompleto,\n    fechaEmision,\n    urlVerificacion\n  }\n}];"
+        "jsCode": "const estudiante = $('Buscar Estudiante (Postgres)').item.json;\nconst cert = $json;\n\nconst fechaEmision = new Date(cert.fecha).toLocaleDateString('es-EC', {\n  year: 'numeric', month: 'long', day: '2-digit'\n});\nconst urlVerificacion = `https://verificacion.tudominio.edu.ec/certificados/${cert.codigoUnico}`;\n\nreturn [{\n  json: {\n    codigoUnico: cert.codigoUnico,\n    cedula: estudiante.cedula,\n    nombreCompleto: estudiante.nombres,\n    carrera: estudiante.carrera,\n    nivel: estudiante.nivel,\n    periodoActual: estudiante.periodoActual,\n    modalidad: estudiante.modalidad,\n    fechaEmision,\n    urlVerificacion\n  }\n}];"
       },
-      "id": "b5555555-5555-4555-8555-555555555555",
-      "name": "Generar Código Único",
+      "id": "bacacaca-caca-4aca-8aca-acacacacacac",
+      "name": "Formatear Respuesta Existente",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [980, -20]
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "INSERT INTO tickets_solicitud (id, cedula, tipo_tramite, estado, fecha_resolucion)\nVALUES (\n  'TCK-' || EXTRACT(YEAR FROM NOW()) || '-' || LPAD(nextval('tickets_solicitud_seq')::text, 6, '0'),\n  $1, 'CERTIFICADO_MATRICULA', 'COMPLETADO', NOW()\n)\nRETURNING id",
-        "additionalFields": {
-          "queryParams": "={{ $json.cedula }}"
-        }
-      },
-      "id": "bcccccc1-cccc-4ccc-8ccc-ccccccccccc1",
-      "name": "Crear Ticket del Trámite (Postgres)",
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 1,
-      "position": [1240, -20],
-      "credentials": {
-        "postgres": {
-          "id": "REEMPLAZAR",
-          "name": "REEMPLAZAR con credenciales reales"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "INSERT INTO certificados_matricula (ticket_id, codigo_unico, cedula, nombre_completo, carrera, nivel, periodo_actual, url_verificacion)\nVALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
-        "additionalFields": {
-          "queryParams": "={{ [$json.id, $('Generar Código Único').item.json.codigoUnico, $('Generar Código Único').item.json.cedula, $('Generar Código Único').item.json.nombreCompleto, $('Generar Código Único').item.json.carrera, $('Generar Código Único').item.json.nivel, $('Generar Código Único').item.json.periodoActual, $('Generar Código Único').item.json.urlVerificacion] }}"
-        }
-      },
-      "id": "b6666666-6666-4666-8666-666666666666",
-      "name": "Guardar Certificado (Postgres)",
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 1,
-      "position": [1500, -20],
-      "credentials": {
-        "postgres": {
-          "id": "REEMPLAZAR",
-          "name": "REEMPLAZAR con credenciales reales"
-        }
-      }
+      "position": [
+        1500,
+        -220
+      ]
     },
     {
       "parameters": {
         "respondWith": "json",
         "responseBody": "={{ $json }}",
         "options": {
-          "responseCode": 200
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
         }
       },
       "id": "b7777777-7777-4777-8777-777777777777",
       "name": "Responder: Certificado existente",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [1500, -260]
+      "position": [
+        1760,
+        -220
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "resource": "database",
+        "query": "INSERT INTO qr_codigos (estudiante_id, payload) VALUES ($1, '{\"tipo\": \"CERT_MATRICULA\"}'::jsonb) RETURNING id, identificador",
+        "options": {
+          "queryReplacement": "={{ [ $('Buscar Estudiante (Postgres)').item.json.estudiante_id ] }}"
+        }
+      },
+      "id": "bcccccc1-cccc-4ccc-8ccc-ccccccccccc1",
+      "name": "Crear QR (Postgres)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1240,
+        -20
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "REEMPLAZAR",
+          "name": "REEMPLAZAR con credenciales reales"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "resource": "database",
+        "query": "INSERT INTO certificados (estudiante_id, tipo, qr_id, fecha, hora, periodo_lectivo_codigo, periodo_lectivo_nombre, modalidad, periodo_ingreso_codigo, periodo_ingreso_nombre, nivel_ingreso, firmante_nombre, firmante_cargo) VALUES ($1, 'CERT_MATRICULA', $2, CURRENT_DATE, CURRENT_TIME, $3, $4, $5, $6, $7, $8, 'Mtr. Alexandra Gordon M.', 'Secretaria General (s)') RETURNING id, fecha",
+        "options": {
+          "queryReplacement": "={{ [$('Buscar Estudiante (Postgres)').item.json.estudiante_id, $json.id, $('Buscar Estudiante (Postgres)').item.json.periodo_codigo, $('Buscar Estudiante (Postgres)').item.json.periodoActual, $('Buscar Estudiante (Postgres)').item.json.modalidad, $('Buscar Estudiante (Postgres)').item.json.periodo_ingreso_codigo, $('Buscar Estudiante (Postgres)').item.json.periodo_ingreso_nombre, $('Buscar Estudiante (Postgres)').item.json.nivel_ingreso] }}"
+        }
+      },
+      "id": "b6666666-6666-4666-8666-666666666666",
+      "name": "Insertar Certificado (Postgres)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1500,
+        -20
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "REEMPLAZAR",
+          "name": "REEMPLAZAR con credenciales reales"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const estudiante = $('Buscar Estudiante (Postgres)').item.json;\nconst qr = $('Crear QR (Postgres)').item.json;\nconst cert = $('Insertar Certificado (Postgres)').item.json;\n\nconst fechaEmision = new Date(cert.fecha).toLocaleDateString('es-EC', {\n  year: 'numeric', month: 'long', day: '2-digit'\n});\nconst urlVerificacion = `https://verificacion.tudominio.edu.ec/certificados/${qr.identificador}`;\n\nreturn [{\n  json: {\n    codigoUnico: qr.identificador,\n    cedula: estudiante.cedula,\n    nombreCompleto: estudiante.nombres,\n    carrera: estudiante.carrera,\n    nivel: estudiante.nivel,\n    periodoActual: estudiante.periodoActual,\n    modalidad: estudiante.modalidad,\n    fechaEmision,\n    urlVerificacion\n  }\n}];"
+      },
+      "id": "b5555555-5555-4555-8555-555555555555",
+      "name": "Formatear Respuesta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        -20
+      ]
     },
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ {\n  \"codigoUnico\": $('Generar Código Único').item.json.codigoUnico,\n  \"cedula\": $('Generar Código Único').item.json.cedula,\n  \"nombreCompleto\": $('Generar Código Único').item.json.nombreCompleto,\n  \"carrera\": $('Generar Código Único').item.json.carrera,\n  \"nivel\": $('Generar Código Único').item.json.nivel,\n  \"periodoActual\": $('Generar Código Único').item.json.periodoActual,\n  \"fechaEmision\": $('Generar Código Único').item.json.fechaEmision,\n  \"urlVerificacion\": $('Generar Código Único').item.json.urlVerificacion\n} }}",
+        "responseBody": "={{ {\n  \"codigoUnico\": $json.codigoUnico,\n  \"cedula\": $json.cedula,\n  \"nombreCompleto\": $json.nombreCompleto,\n  \"carrera\": $json.carrera,\n  \"nivel\": $json.nivel,\n  \"periodoActual\": $json.periodoActual,\n  \"modalidad\": $json.modalidad,\n  \"fechaEmision\": $json.fechaEmision,\n  \"urlVerificacion\": $json.urlVerificacion\n} }}",
         "options": {
-          "responseCode": 200
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
         }
       },
       "id": "bddddddd-dddd-4ddd-8ddd-ddddddddddd1",
       "name": "Responder: Certificado nuevo",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [1760, -120]
+      "position": [
+        2280,
+        -20
+      ]
     },
     {
       "parameters": {
         "respondWith": "json",
         "responseBody": "={{ { \"error\": \"El estudiante no existe o no está matriculado en el periodo actual.\" } }}",
         "options": {
-          "responseCode": 400
+          "responseCode": 400,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
         }
       },
       "id": "b8888888-8888-4888-8888-888888888888",
       "name": "Responder: No matriculado",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [980, 260]
+      "position": [
+        980,
+        260
+      ]
     }
   ],
   "connections": {
@@ -226,6 +360,17 @@
         [
           {
             "node": "Buscar Estudiante (Postgres)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook (OPTIONS)": {
+      "main": [
+        [
+          {
+            "node": "Responder: CORS preflight",
             "type": "main",
             "index": 0
           }
@@ -276,43 +421,54 @@
       "main": [
         [
           {
-            "node": "Responder: Certificado existente",
+            "node": "Formatear Respuesta Existente",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Generar Código Único",
+            "node": "Crear QR (Postgres)",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Generar Código Único": {
+    "Formatear Respuesta Existente": {
       "main": [
         [
           {
-            "node": "Crear Ticket del Trámite (Postgres)",
+            "node": "Responder: Certificado existente",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Crear Ticket del Trámite (Postgres)": {
+    "Crear QR (Postgres)": {
       "main": [
         [
           {
-            "node": "Guardar Certificado (Postgres)",
+            "node": "Insertar Certificado (Postgres)",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Guardar Certificado (Postgres)": {
+    "Insertar Certificado (Postgres)": {
+      "main": [
+        [
+          {
+            "node": "Formatear Respuesta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formatear Respuesta": {
       "main": [
         [
           {
@@ -327,5 +483,6 @@
   "pinData": {},
   "settings": {
     "executionOrder": "v1"
-  }
+  },
+  "active": true
 }

@@ -1,150 +1,244 @@
-# Esquema temporal de PostgreSQL
+# Esquema real de PostgreSQL (a partir de 2026-07-20)
 
-**Importante:** este esquema es un punto de partida razonable para poder
-desarrollar los workflows ya mismo, mientras no exista el esquema definitivo
-(compartido con el equipo de la web). Cuando llegue el esquema real, lo que
-cambia son las **queries dentro de los nodos Postgres** de cada workflow — el
-contrato de endpoints (`CONTRATO-API.md`) y la app **no cambian**, porque la
-app nunca habla con la base de datos directamente.
+**Este ya NO es un esquema temporal** — es el dump real (`yavibot_dump.sql`)
+compartido por el usuario, generado por el sistema completo que construyó el
+equipo (chatbot + panel administrativo + alertas de laboratorio). Reemplaza
+por completo al esquema temporal que se documentaba antes en este archivo.
 
-Motor asumido: PostgreSQL. Si el esquema real termina siendo MySQL/SQL Server,
-la estructura conceptual (tablas, relaciones) se mantiene igual; solo cambia
-la sintaxis de creación y el tipo de nodo en n8n.
+Motor: PostgreSQL 16, con la extensión `pgcrypto` habilitada (se usa para
+hashear los OTP — ver más abajo).
 
 ---
 
-## Diagrama de relaciones
+## Alcance: qué toca esta app y qué no
 
-```
-estudiantes ──┬──< tickets_verificacion
-              │
-              └──< tickets_solicitud >── tipos_tramite
-                        │
-                        └──1:1── certificados_matricula
-```
+El dump tiene **~20 tablas** para un sistema mucho más grande que solo
+certificados. Esta app (chatbot YaviBot) solo lee/escribe en un subconjunto:
+
+| Tabla | La usa esta app | Para qué |
+|---|---|---|
+| `estudiantes` | ✅ | identificar al estudiante por cédula |
+| `carreras` | ✅ | nombre de la carrera (JOIN) |
+| `periodos_academicos` | ✅ | el periodo lectivo vigente (JOIN, `vigente=true`) |
+| `otp_codigos` | ✅ | el "ticket" de verificación (OTP hasheado) |
+| `qr_codigos` | ✅ | el código único/QR del certificado |
+| `certificados` | ✅ | el certificado de matrícula emitido |
+| `tickets` | ✅ | trámites manuales (Anulación de Matrícula) |
+| `tipos_solicitud` | ✅ | catálogo de trámites |
+| `asignaciones_responsables` | ✅ (opcional) | a qué `usuario_panel` se asigna un ticket nuevo |
+| `eventos` | ✅ (opcional) | log de eventos para que el panel se entere de tickets nuevos |
+| `configuracion_sistema` | referencia | datos institucionales (nombre, firma) — se citan como literales, no se leen dinámicamente por ahora |
+| `docentes` | ✅ | identificar al docente por cédula (segunda identidad, mismo flujo cédula+OTP — rol Docente) |
+| `laboratorios` | ✅ | catálogo para elegir laboratorio al reportar una incidencia |
+| `alertas`, `alerta_historial` | ✅ | la incidencia de laboratorio reportada por el docente (rol Docente) |
+| `adjuntos` | ✅ (opcional) | la foto opcional de la incidencia de laboratorio (rol Docente) — se guarda en disco, esta tabla solo registra la ruta/metadatos |
+| `usuarios_panel`, `roles`, `permisos`, `roles_permisos` | ✅ (parcial) | solo se lee (nunca se escribe): resolver `alertas.profesor_id`/`responsable_id` cruzando `docentes.cedula = usuarios_panel.cedula`. El login del panel administrativo en sí sigue sin ser parte de esta app |
+| `intentos_acceso`, `auditoria`, `importaciones` | ❌ | fuera del alcance de esta app |
 
 ---
 
-## `estudiantes`
+## Diferencias clave frente a lo que se había asumido antes
 
-Placeholder — cuando llegue el esquema real de la institución, esta tabla
-probablemente ya exista con otro nombre/estructura (ej. viene del sistema
-académico). Aquí se asume lo mínimo que la app necesita.
+Estas son las razones concretas por las que las pruebas fallaban:
 
+1. **La columna es `correo`, no `correo_institucional`.**
+2. **No existe `apellidos` como columna separada** — `estudiantes.nombres`
+   contiene el nombre completo (ej. `"NARVAEZ LLAMUCO ANDERSON SEBASTIAN"`).
+   Los workflows ahora devuelven ese valor completo en `nombres` y
+   `apellidos: ''` para no romper el contrato que ya consume la app.
+3. **`estado_matricula` admite 4 valores**, no 2:
+   `MATRICULADO | RETIRADO | REPROBADO | APROBADO`. La validación de
+   "¿puede generar certificado?" sigue siendo `=== 'MATRICULADO'` — sigue
+   funcionando igual, solo hay más formas de estar "no matriculado".
+4. **No hay columna `periodo_actual` en `estudiantes`.** El periodo lectivo
+   vigente vive en `periodos_academicos` (columna `vigente boolean`, con un
+   índice único que garantiza que solo uno puede ser `true` a la vez). Se
+   obtiene con `LEFT JOIN periodos_academicos ON vigente = true`.
+5. **`carrera` no es un texto en `estudiantes`** — es `carrera_id` (FK a
+   `carreras`). Requiere JOIN para obtener el nombre.
+6. **El OTP se guarda HASHEADO (`codigo_hash`), nunca en texto plano.** Se
+   usa `pgcrypto`: `encode(digest(codigo, 'sha256'), 'hex')` tanto al
+   guardarlo como al compararlo. Antes los workflows comparaban texto plano
+   contra `tickets_verificacion.ticket` — eso ya no aplica.
+7. **La idempotencia del certificado ahora SÍ está forzada por la base de
+   datos en esta instancia local/independiente** (`ALTER TABLE certificados
+   ADD CONSTRAINT ux_certificado_estudiante_periodo UNIQUE (estudiante_id,
+   periodo_lectivo_codigo)`, ya aplicado a `yavirac-db` y agregado a
+   `init.sql`). El workflow sigue haciendo el chequeo "¿ya existe?" antes de
+   insertar (por UX — para responder con el certificado existente en vez de
+   un error), pero ahora la base de datos también lo garantiza ante una
+   condición de carrera, sin importar qué cliente escriba (app o una futura
+   web). **Ojo:** el dump ORIGINAL que compartió el equipo (con ~1400
+   estudiantes) sí tenía duplicados reales para el mismo periodo (ej.
+   estudiante id=1 con 3 certificados en `2026-I`) — este constraint se
+   verificó contra los datos actualmente cargados en `yavirac-db` (sin
+   duplicados) antes de aplicarse. Si en algún momento esta base se
+   fusiona/sincroniza con la base de datos real del equipo, hay que limpiar
+   esos duplicados históricos primero (o el `ALTER TABLE` fallará), y
+   coordinarlo con el resto del equipo ya que es un esquema compartido.
+8. **El código único del certificado es el UUID de `qr_codigos.identificador`**
+   (`gen_random_uuid()`), no un string tipo `MAT-2026-XXXX` inventado. El
+   contrato de la app (`codigoUnico`) ahora se llena con ese UUID.
+9. **`tipos_solicitud.genera_ticket = false` para `CERT_MATRICULA`.** Es
+   decir, el propio esquema real ya dice que el certificado de matrícula
+   **no genera una fila en `tickets`** — se rastrea únicamente vía
+   `certificados` + `qr_codigos`. Por eso "Consultar estado de mis tickets"
+   en la app solo debe mostrar trámites manuales (Anulación de Matrícula),
+   nunca certificados de matrícula.
+10. **Los estados de `tickets` están en español y son distintos**:
+    `Pendiente | En Proceso | Resuelto` (no existe un estado "rechazado").
+    Los workflows traducen esto a `EN_PROCESO | COMPLETADO` para no romper
+    el modelo/UI que ya tiene la app (`Pendiente`/`En Proceso` → `EN_PROCESO`,
+    `Resuelto` → `COMPLETADO`).
+11. **El `codigo` de un ticket (`TK-000001`) se genera después del insert**,
+    a partir del `id` real (`'TK-' || LPAD(id::text, 6, '0')`) — no con una
+    secuencia separada, para que siempre coincida con el `id` (así están
+    los datos de ejemplo).
+
+---
+
+## Tablas relevantes (definición completa, tal como están en el dump real)
+
+### `estudiantes`
 ```sql
-CREATE TABLE estudiantes (
-  id                    SERIAL PRIMARY KEY,
-  cedula                VARCHAR(10)  NOT NULL UNIQUE,
-  nombres               VARCHAR(100) NOT NULL,
-  apellidos             VARCHAR(100) NOT NULL,
-  correo_institucional  VARCHAR(150) NOT NULL,
-  carrera               VARCHAR(150) NOT NULL,
-  nivel                 VARCHAR(50)  NOT NULL,
-  periodo_actual        VARCHAR(50)  NOT NULL,
-  estado_matricula      VARCHAR(20)  NOT NULL
-                         CHECK (estado_matricula IN ('MATRICULADO', 'NO_MATRICULADO')),
-  creado_en             TIMESTAMP    NOT NULL DEFAULT NOW()
-);
+cedula, nombres, carrera_id (FK carreras), nivel, paralelo,
+estado_matricula (MATRICULADO|RETIRADO|REPROBADO|APROBADO),
+correo, modalidad (PRESENCIAL|DUAL|EN LINEA|SEMIPRESENCIAL),
+periodo_ingreso_id (FK periodos_academicos, nullable), nivel_ingreso
 ```
 
-## `tickets_verificacion`
-
-El OTP de 6 dígitos que autentica al estudiante por correo antes de mostrarle
-el menú (ver endpoints 2 y 3 de `CONTRATO-API.md`).
-
+### `carreras`
 ```sql
-CREATE TABLE tickets_verificacion (
-  id          SERIAL PRIMARY KEY,
-  cedula      VARCHAR(10) NOT NULL REFERENCES estudiantes(cedula),
-  ticket      VARCHAR(6)  NOT NULL,
-  creado_en   TIMESTAMP   NOT NULL DEFAULT NOW(),
-  expira_en   TIMESTAMP   NOT NULL,
-  usado       BOOLEAN     NOT NULL DEFAULT FALSE
-);
+id, codigo, nombre
 ```
 
-## `tipos_tramite`
-
-Catálogo de trámites disponibles. **Agregar un trámite nuevo es una fila en
-esta tabla**, no un despliegue de código — esto es lo que hace escalable al
-sistema de tickets.
-
+### `periodos_academicos`
 ```sql
-CREATE TABLE tipos_tramite (
-  codigo            VARCHAR(40)  PRIMARY KEY,
-  nombre            VARCHAR(150) NOT NULL,
-  genera_documento  BOOLEAN      NOT NULL DEFAULT FALSE,
-  -- automatizado = TRUE: un workflow lo resuelve solo (como matrícula).
-  -- automatizado = FALSE: el workflow solo crea el ticket EN_PROCESO;
-  -- lo resuelve manualmente el personal administrativo.
-  automatizado      BOOLEAN      NOT NULL DEFAULT FALSE
-);
-
-INSERT INTO tipos_tramite (codigo, nombre, genera_documento, automatizado) VALUES
-  ('CERTIFICADO_MATRICULA',   'Certificado de Matrícula',    TRUE,  TRUE),
-  ('RECORD_ACADEMICO',        'Récord Académico',            TRUE,  FALSE),
-  ('CERTIFICADO_VINCULACION', 'Certificado de Vinculación',  TRUE,  FALSE),
-  ('ANULACION_MATRICULA',     'Anulación de Matrícula',      FALSE, FALSE);
+id, codigo (ej '2026-I'), nombre (ej 'mayo-septiembre 2026'),
+fecha_inicio, fecha_fin, vigente boolean (único índice: solo uno true)
 ```
 
-`codigo` usa los mismos valores que `OpcionMenu` en la app
-(`estudiante.model.ts`), para que no haga falta mapear nombres entre capas.
-
-## `tickets_solicitud`
-
-El núcleo del sistema de trámites. Cada vez que un estudiante pide algo desde
-el menú, se crea un registro aquí — es lo que alimenta la pantalla
-**"Consultar estado de mis tickets"** de la app.
-
+### `otp_codigos`
 ```sql
-CREATE SEQUENCE tickets_solicitud_seq START 1;
-
-CREATE TABLE tickets_solicitud (
-  id                VARCHAR(20) PRIMARY KEY,  -- ej. TCK-2026-000123
-  cedula            VARCHAR(10) NOT NULL REFERENCES estudiantes(cedula),
-  tipo_tramite      VARCHAR(40) NOT NULL REFERENCES tipos_tramite(codigo),
-  estado            VARCHAR(20) NOT NULL DEFAULT 'EN_PROCESO'
-                     CHECK (estado IN ('EN_PROCESO', 'COMPLETADO', 'RECHAZADO')),
-  fecha_solicitud   TIMESTAMP   NOT NULL DEFAULT NOW(),
-  fecha_resolucion  TIMESTAMP,
-  observaciones     TEXT
-);
+cedula, correo, codigo_hash (sha256 hex vía pgcrypto), canal ('chatbot'|'panel_recovery'),
+expira_en, usado boolean
 ```
 
-El `id` se genera en el workflow con:
-
+### `qr_codigos`
 ```sql
-'TCK-' || EXTRACT(YEAR FROM NOW()) || '-' || LPAD(nextval('tickets_solicitud_seq')::text, 6, '0')
+id, identificador uuid (gen_random_uuid(), ÚNICO), estudiante_id,
+certificado_id (FK, nullable), payload jsonb, verificaciones int
 ```
 
-## `certificados_matricula`
-
-Detalle específico **solo** del trámite que genera documento+QR de forma
-100% automática. Se relaciona 1:1 con su `ticket_solicitud` (todo certificado
-tiene un ticket; no todo ticket tiene un certificado, porque los otros
-trámites no generan este tipo de documento).
-
+### `certificados`
 ```sql
-CREATE TABLE certificados_matricula (
-  id                SERIAL PRIMARY KEY,
-  ticket_id         VARCHAR(20)  NOT NULL REFERENCES tickets_solicitud(id),
-  codigo_unico      VARCHAR(40)  NOT NULL UNIQUE,
-  cedula            VARCHAR(10)  NOT NULL,
-  nombre_completo   VARCHAR(150) NOT NULL,
-  carrera           VARCHAR(150) NOT NULL,
-  nivel             VARCHAR(50)  NOT NULL,
-  periodo_actual    VARCHAR(50)  NOT NULL,
-  fecha_emision     TIMESTAMP    NOT NULL DEFAULT NOW(),
-  url_verificacion  TEXT         NOT NULL,
-  UNIQUE (cedula, periodo_actual)
-);
+id, estudiante_id, tipo (default 'CERT_MATRICULA'), qr_id (FK único a qr_codigos),
+pdf_path (nullable — esta app no genera PDF servidor, se deja NULL),
+fecha, hora, periodo_lectivo_codigo, periodo_lectivo_nombre, modalidad,
+periodo_ingreso_codigo, periodo_ingreso_nombre, nivel_ingreso,
+firmante_nombre, firmante_cargo
 ```
 
-El `UNIQUE (cedula, periodo_actual)` es la garantía de idempotencia a nivel de
-base de datos: es imposible que existan dos certificados distintos para el
-mismo estudiante en el mismo periodo, sin importar cuántas veces lo pida ni
-desde qué canal (web o app) — requisito confirmado por la coordinación
-académica.
+### `tipos_solicitud`
+```sql
+id, codigo, nombre, genera_ticket boolean, ambito
+-- datos reales: CERT_MATRICULA(f), RECORD_ACADEMICO(t), CERT_VINCULACION(t),
+--               ANULACION_MATRICULA(t), ALERTA_LAB(t)
+```
 
-El equipo de la web usará esta misma tabla (`codigo_unico`) para el endpoint
-público de verificación del QR.
+### `tickets`
+```sql
+id, codigo ('TK-000001'), tipo_solicitud_id (FK), estudiante_id, carrera_id,
+nivel, paralelo, descripcion, estado ('Pendiente'|'En Proceso'|'Resuelto'),
+responsable_id (FK usuarios_panel), creado_en, actualizado_en
+```
+
+### `asignaciones_responsables`
+```sql
+id, tipo_solicitud_id (FK), carrera_id (nullable = aplica a todas),
+usuario_id (FK usuarios_panel), vigente boolean
+```
+
+### `eventos`
+```sql
+id, tipo (ej 'TicketCreado', 'TicketAsignado'), payload jsonb,
+origen (ej 'chatbot'), procesado boolean
+```
+
+### `docentes` (rol Docente)
+```sql
+id, cedula (único, CHECK 10 dígitos), nombre_docente, correo (único),
+creado_en, actualizado_en
+```
+Segunda identidad, paralela a `estudiantes` — se busca por cédula con el
+mismo flujo cédula+OTP. Cada docente real tiene también una fila en
+`usuarios_panel` con la misma cédula/correo (rol `PROFESOR`), necesaria para
+resolver `alertas.profesor_id` (ver más abajo).
+
+### `laboratorios` (rol Docente)
+```sql
+id, codigo (único, ej 'LAB-01'), nombre, cantidad_equipos
+```
+Catálogo fijo que consume `/consultar-laboratorios` para poblar el paso
+"elige un laboratorio" del flujo de Reportar Incidencia.
+
+### `adjuntos` (rol Docente — foto de incidencia, opcional)
+```sql
+id, tipo (ej 'foto_alerta'), ruta (ej 'storage/uploads/<archivo>'),
+mime (CHECK: 'image/jpeg'|'image/png'), tamano_bytes (CHECK: <= 5242880 = 5MB),
+hash (nullable), creado_en
+```
+No guarda el binario — `ruta` apunta a un archivo físico. El workflow
+`reportar-incidencia-laboratorio` recibe la foto como base64
+(`fotoBase64`/`fotoMime` en el request), la escribe en disco con el nodo
+`readWriteFile` de n8n dentro del volumen Docker `uploads_data` (montado en
+`/data/storage`, ver `docker-compose.yml`) y solo entonces inserta esta
+fila. Requiere la variable de entorno `N8N_RESTRICT_FILE_ACCESS_TO`
+apuntando a `/data/storage` — por defecto n8n solo permite escribir dentro
+de `~/.n8n-files`, y rechaza (`"... is not writable."`) cualquier otra ruta.
+Adjuntar foto es opcional: si el docente no adjunta nada, `alertas.adjunto_id`
+queda `NULL` y no se toca esta tabla.
+
+### `alertas` (rol Docente — la incidencia en sí)
+```sql
+id, codigo (único, ej 'AL-000001', se genera post-insert igual que tickets),
+laboratorio_id (FK laboratorios), descripcion, adjunto_id (FK adjuntos, nullable),
+profesor_id (FK usuarios_panel — quién reportó), estado
+('Pendiente'|'En revisión'|'Resuelta'), responsable_id (FK usuarios_panel, nullable),
+ticket_id (FK tickets, nullable — no se usa desde esta app), creado_en, actualizado_en
+```
+`profesor_id` y `responsable_id` son FKs a `usuarios_panel`, **no** a
+`docentes` — el workflow resuelve `profesor_id` cruzando
+`docentes.cedula = usuarios_panel.cedula` y `responsable_id` vía
+`asignaciones_responsables` (tipo `ALERTA_LAB`, sin filtro de carrera). A
+diferencia de Anulación de Matrícula, no hay límite de incidencias
+simultáneas por docente.
+
+### `alerta_historial`
+```sql
+id, alerta_id (FK alertas, ON DELETE CASCADE), estado_anterior, estado_nuevo,
+observacion, usuario_id (FK usuarios_panel, nullable), creado_en
+```
+Bitácora de cambios de estado de una alerta. El workflow de reporte inserta
+la primera fila (`NULL → 'Pendiente'`) al crear la incidencia; cambios
+posteriores de estado los haría el panel administrativo (fuera de esta app).
+
+### `usuarios_panel` / `roles` (solo lectura)
+```sql
+-- usuarios_panel: id, cedula, correo, nombre, rol_id (FK roles), contrasena_hash, activo
+-- roles: id, codigo (ej 'PROFESOR', 'RESP_LABORATORIOS'), nombre, descripcion
+```
+Esta app nunca escribe en estas tablas ni implementa el login del panel —
+solo las lee para resolver `alertas.profesor_id`/`responsable_id`.
+
+---
+
+## Configuración institucional citada como literal (no leída dinámicamente)
+
+Tomado de `configuracion_sistema` en el dump — si cambian, hay que actualizar
+los workflows a mano (o, a futuro, hacer un SELECT a esta tabla):
+
+- `institucion.nombre_oficial` = Instituto Superior Tecnológico de Turismo y Patrimonio "YAVIRAC"
+- `institucion.ciudad_emision` = Quito
+- `firma.nombre` = Mtr. Alexandra Gordon M.
+- `firma.cargo` = Secretaria General (s)

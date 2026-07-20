@@ -3,43 +3,110 @@
   "nodes": [
     {
       "parameters": {
-        "content": "## Verificar ticket\n- Busca un ticket para esa cédula que NO esté usado, NO haya expirado y coincida exactamente.\n- Si existe, lo marca como usado (para que no se pueda reutilizar) y responde valido:true.\n- Si no existe/expiró/no coincide, responde valido:false.\n- Ajusta el nodo Postgres al motor real de base de datos.",
-        "height": 220,
-        "width": 340
+        "content": "## Verificar ticket (esquema REAL)\n- El ticket se guarda hasheado (otp_codigos.codigo_hash) — se compara hasheando el valor recibido con la MISMA función (pgcrypto sha256), nunca en texto plano.\n- Busca un OTP para esa cédula que NO esté usado, NO haya expirado, canal='chatbot' y cuyo hash coincida.\n- Si existe, lo marca como usado (UPDATE parametrizado) y responde valido:true.\n- Si no, responde valido:false.\n- Incluye manejo de preflight CORS (OPTIONS).",
+        "height": 260,
+        "width": 360
       },
       "id": "d1111111-1111-4111-8111-111111111111",
       "name": "Nota",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
-      "position": [-220, -40]
+      "position": [
+        -220,
+        -140
+      ]
     },
     {
       "parameters": {
         "httpMethod": "POST",
         "path": "verificar-ticket",
         "responseMode": "responseNode",
-        "options": {}
+        "options": {},
+        "authentication": "headerAuth"
       },
       "id": "d2222222-2222-4222-8222-222222222222",
       "name": "Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [200, 0],
-      "webhookId": "verificar-ticket"
+      "position": [
+        200,
+        0
+      ],
+      "webhookId": "verificar-ticket",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REEMPLAZAR",
+          "name": "REEMPLAZAR con credencial Header Auth (X-Api-Key)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "OPTIONS",
+        "path": "verificar-ticket",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "dcccccc1-cccc-4ccc-8ccc-ccccccccccc1",
+      "name": "Webhook (OPTIONS)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        200,
+        300
+      ],
+      "webhookId": "verificar-ticket-options"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "",
+        "options": {
+          "responseCode": 204,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              },
+              {
+                "name": "Access-Control-Allow-Methods",
+                "value": "POST, OPTIONS"
+              },
+              {
+                "name": "Access-Control-Allow-Headers",
+                "value": "Content-Type, X-Api-Key"
+              }
+            ]
+          }
+        }
+      },
+      "id": "dcccccc2-cccc-4ccc-8ccc-ccccccccccc2",
+      "name": "Responder: CORS preflight",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        460,
+        300
+      ]
     },
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT id FROM tickets_verificacion WHERE cedula = $1 AND ticket = $2 AND usado = FALSE AND expira_en > NOW() ORDER BY creado_en DESC LIMIT 1",
-        "additionalFields": {
-          "queryParams": "={{ [$json.body.cedula, $json.body.ticket] }}"
+        "resource": "database",
+        "query": "SELECT id FROM otp_codigos WHERE cedula = $1 AND codigo_hash = encode(digest($2, 'sha256'), 'hex') AND usado = FALSE AND expira_en > NOW() AND canal = 'chatbot' ORDER BY creado_en DESC LIMIT 1",
+        "options": {
+          "queryReplacement": "={{ [$json.body.cedula, $json.body.ticket] }}"
         }
       },
       "id": "d3333333-3333-4333-8333-333333333333",
       "name": "Buscar Ticket Vigente (Postgres)",
       "type": "n8n-nodes-base.postgres",
-      "typeVersion": 1,
-      "position": [460, 0],
+      "typeVersion": 2.6,
+      "position": [
+        460,
+        0
+      ],
       "alwaysOutputData": true,
       "credentials": {
         "postgres": {
@@ -75,21 +142,28 @@
       "name": "¿Ticket válido?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [720, 0]
+      "position": [
+        720,
+        0
+      ]
     },
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "UPDATE tickets_verificacion SET usado = TRUE WHERE id = $1",
-        "additionalFields": {
-          "queryParams": "={{ $json.id }}"
+        "resource": "database",
+        "query": "UPDATE otp_codigos SET usado = TRUE WHERE id = $1",
+        "options": {
+          "queryReplacement": "={{ [ $json.id ] }}"
         }
       },
       "id": "d5555555-5555-4555-8555-555555555555",
       "name": "Marcar Ticket Usado (Postgres)",
       "type": "n8n-nodes-base.postgres",
-      "typeVersion": 1,
-      "position": [980, -100],
+      "typeVersion": 2.6,
+      "position": [
+        980,
+        -100
+      ],
       "credentials": {
         "postgres": {
           "id": "REEMPLAZAR",
@@ -102,28 +176,50 @@
         "respondWith": "json",
         "responseBody": "={{ { \"valido\": true } }}",
         "options": {
-          "responseCode": 200
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
         }
       },
       "id": "d6666666-6666-4666-8666-666666666666",
       "name": "Responder: Válido",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [1240, -100]
+      "position": [
+        1240,
+        -100
+      ]
     },
     {
       "parameters": {
         "respondWith": "json",
         "responseBody": "={{ { \"valido\": false } }}",
         "options": {
-          "responseCode": 200
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
         }
       },
       "id": "d7777777-7777-4777-8777-777777777777",
       "name": "Responder: Inválido",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [980, 140]
+      "position": [
+        980,
+        140
+      ]
     }
   ],
   "connections": {
@@ -132,6 +228,17 @@
         [
           {
             "node": "Buscar Ticket Vigente (Postgres)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook (OPTIONS)": {
+      "main": [
+        [
+          {
+            "node": "Responder: CORS preflight",
             "type": "main",
             "index": 0
           }
@@ -182,5 +289,6 @@
   "pinData": {},
   "settings": {
     "executionOrder": "v1"
-  }
+  },
+  "active": true
 }

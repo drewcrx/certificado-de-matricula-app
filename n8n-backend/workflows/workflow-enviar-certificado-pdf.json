@@ -1,0 +1,321 @@
+{
+  "name": "App Matrícula - Enviar Certificado PDF por Correo",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Enviar certificado PDF por correo (esquema REAL)\n- El PDF real (con membrete oficial, jsPDF) lo genera la APP en el navegador (certificado-pdf.service.ts) — n8n no puede correr ese código.\n- Este workflow recibe { cedula, codigoUnico, pdfBase64 } DESPUÉS de que \"Generar Certificado\" ya insertó el registro, y solo se encarga de: 1) verificar que ese codigoUnico realmente pertenece a esa cédula en la BD (para no adjuntar/enviar cualquier PDF arbitrario), y 2) adjuntarlo y enviarlo por SMTP al correo institucional.\n- El PDF llega en base64 (sin el prefijo data:), se convierte a binario con un nodo Code y se adjunta con 'Attachments (File)' del nodo Send Email.\n- Incluye manejo de preflight CORS (OPTIONS).",
+        "height": 320,
+        "width": 420
+      },
+      "id": "f1111111-1111-4111-8111-111111111111",
+      "name": "Nota",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -280,
+        -220
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "enviar-certificado-pdf",
+        "responseMode": "responseNode",
+        "options": {},
+        "authentication": "headerAuth"
+      },
+      "id": "f2222222-2222-4222-8222-222222222222",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        200,
+        0
+      ],
+      "webhookId": "enviar-certificado-pdf",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REEMPLAZAR",
+          "name": "REEMPLAZAR con credencial Header Auth (X-Api-Key)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "OPTIONS",
+        "path": "enviar-certificado-pdf",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "f2222222-2222-4222-8222-222222222223",
+      "name": "Webhook (OPTIONS)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        200,
+        320
+      ],
+      "webhookId": "enviar-certificado-pdf-options"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "",
+        "options": {
+          "responseCode": 204,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              },
+              {
+                "name": "Access-Control-Allow-Methods",
+                "value": "POST, OPTIONS"
+              },
+              {
+                "name": "Access-Control-Allow-Headers",
+                "value": "Content-Type, X-Api-Key"
+              }
+            ]
+          }
+        }
+      },
+      "id": "f3333333-3333-4333-8333-333333333333",
+      "name": "Responder: CORS preflight",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        460,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "resource": "database",
+        "query": "SELECT e.correo AS \"correoInstitucional\", e.nombres AS \"nombreCompleto\", cert.periodo_lectivo_nombre AS \"periodoActual\" FROM certificados cert JOIN qr_codigos qc ON qc.id = cert.qr_id JOIN estudiantes e ON e.id = cert.estudiante_id WHERE e.cedula = $1 AND qc.identificador = $2::uuid LIMIT 1",
+        "options": {
+          "queryReplacement": "={{ [ $json.body.cedula, $json.body.codigoUnico ] }}"
+        }
+      },
+      "id": "f4444444-4444-4444-8444-444444444444",
+      "name": "Verificar Certificado (Postgres)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        460,
+        0
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "REEMPLAZAR",
+          "name": "REEMPLAZAR con credenciales reales"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "cond1",
+              "leftValue": "={{ $json.correoInstitucional }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "f5555555-5555-4555-8555-555555555555",
+      "name": "¿Certificado válido?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        720,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const cedula = $('Webhook').item.json.body.cedula;\nconst pdfBase64 = $('Webhook').item.json.body.pdfBase64;\n\nreturn [{\n  json: $json,\n  binary: {\n    certificado: {\n      data: pdfBase64,\n      mimeType: 'application/pdf',\n      fileName: `certificado-matricula-${cedula}.pdf`\n    }\n  }\n}];"
+      },
+      "id": "f6666666-6666-4666-8666-666666666666",
+      "name": "Adjuntar PDF (Binario)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        980,
+        -120
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "no-reply@yavirac.edu.ec",
+        "toEmail": "={{ $json.correoInstitucional }}",
+        "subject": "=Tu Certificado de Matrícula YAVIRAC — {{ $json.periodoActual }}",
+        "emailFormat": "html",
+        "message": "=<div style=\"font-family: 'Times New Roman', serif; max-width: 600px; margin: 0 auto; padding: 20px;\">\n  <div style=\"text-align: center; margin-bottom: 24px;\">\n    <h2 style=\"color: #1a237e; margin-top: 12px;\">Instituto Superior Tecnológico<br>de Turismo y Patrimonio \"YAVIRAC\"</h2>\n  </div>\n\n  <p>Estimado/a <strong>{{ $json.nombreCompleto }}</strong>,</p>\n\n  <p>Adjunto encontrarás tu <strong>Certificado de Matrícula</strong> correspondiente al periodo lectivo <strong>{{ $json.periodoActual }}</strong>, en formato PDF con el membrete oficial del instituto.</p>\n\n  <p>El código QR incluido en el documento es único e irrepetible, y permite verificar la autenticidad de este certificado en el sistema institucional.</p>\n\n  <hr style=\"border: none; border-top: 1px solid #ddd; margin: 24px 0;\" />\n\n  <p style=\"color: #666; font-size: 12px; text-align: center;\">\n    Este correo fue generado automáticamente por el sistema YaviBot.<br>\n    Instituto Superior Tecnológico de Turismo y Patrimonio \"YAVIRAC\" | www.yavirac.edu.ec\n  </p>\n</div>",
+        "options": {
+          "fileAttachments": "certificado"
+        }
+      },
+      "id": "f7777777-7777-4777-8777-777777777777",
+      "name": "Enviar PDF por Correo (SMTP)",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1240,
+        -120
+      ],
+      "notes": "CONFIGURAR: credenciales SMTP (Mailtrap para pruebas) en Settings > Credentials > SMTP.",
+      "credentials": {
+        "smtp": {
+          "id": "REEMPLAZAR",
+          "name": "REEMPLAZAR con credenciales SMTP (Mailtrap en pruebas)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"enviado\": true } }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "f8888888-8888-4888-8888-888888888888",
+      "name": "Responder: Enviado",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1500,
+        -120
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"error\": \"No se encontró un certificado con esa cédula y código.\" } }}",
+        "options": {
+          "responseCode": 404,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "f9999999-9999-4999-8999-999999999999",
+      "name": "Responder: No encontrado",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        980,
+        160
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Verificar Certificado (Postgres)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook (OPTIONS)": {
+      "main": [
+        [
+          {
+            "node": "Responder: CORS preflight",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verificar Certificado (Postgres)": {
+      "main": [
+        [
+          {
+            "node": "¿Certificado válido?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Certificado válido?": {
+      "main": [
+        [
+          {
+            "node": "Adjuntar PDF (Binario)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder: No encontrado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Adjuntar PDF (Binario)": {
+      "main": [
+        [
+          {
+            "node": "Enviar PDF por Correo (SMTP)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar PDF por Correo (SMTP)": {
+      "main": [
+        [
+          {
+            "node": "Responder: Enviado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": true
+}

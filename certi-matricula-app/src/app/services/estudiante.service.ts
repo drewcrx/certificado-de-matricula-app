@@ -5,9 +5,13 @@ import { delay, map } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
 import {
   CertificadoMatricula,
+  Docente,
   EnvioTicketVerificacion,
   Estudiante,
-  TicketSolicitud
+  IncidenciaLaboratorio,
+  Laboratorio,
+  TicketSolicitud,
+  Usuario
 } from '../models/estudiante.model';
 
 /**
@@ -17,6 +21,7 @@ import {
  */
 const ESTUDIANTES_MOCK: Estudiante[] = [
   {
+    tipoUsuario: 'ESTUDIANTE',
     cedula: '1702030402',
     nombres: 'Andrew',
     apellidos: 'Carrera',
@@ -27,6 +32,7 @@ const ESTUDIANTES_MOCK: Estudiante[] = [
     estadoMatricula: 'MATRICULADO'
   },
   {
+    tipoUsuario: 'ESTUDIANTE',
     cedula: '1122334459',
     nombres: 'Mishell',
     apellidos: 'Torres',
@@ -37,6 +43,7 @@ const ESTUDIANTES_MOCK: Estudiante[] = [
     estadoMatricula: 'MATRICULADO'
   },
   {
+    tipoUsuario: 'ESTUDIANTE',
     cedula: '0908070600',
     nombres: 'Kevin',
     apellidos: 'Andrade',
@@ -46,6 +53,24 @@ const ESTUDIANTES_MOCK: Estudiante[] = [
     periodoActual: 'Abril 2026 - Agosto 2026',
     estadoMatricula: 'NO_MATRICULADO'
   }
+];
+
+/** Docente de prueba, solo para el modo mock. */
+const DOCENTES_MOCK: Docente[] = [
+  {
+    tipoUsuario: 'DOCENTE',
+    cedula: '1710000009',
+    nombres: 'Pedro Sánchez (prueba)',
+    correoInstitucional: 'pedro.sanchez@yavirac.edu.ec'
+  }
+];
+
+const LABORATORIOS_MOCK: Laboratorio[] = [
+  { codigo: 'LAB-01', nombre: 'Laboratorio de Tolouse' },
+  { codigo: 'LAB-02', nombre: 'Laboratorio de Xian' },
+  { codigo: 'LAB-03', nombre: 'Laboratorio de Yasuni' },
+  { codigo: 'LAB-04', nombre: 'Laboratorio de Ninive' },
+  { codigo: 'LAB-05', nombre: 'Laboratorio de Sarasota' }
 ];
 
 @Injectable({
@@ -76,37 +101,40 @@ export class EstudianteService {
 
   /**
    * Equivale al webhook de n8n que recibirá la cédula y devolverá los datos
-   * del estudiante consultados desde la base de datos del servidor.
+   * del usuario consultados desde la base de datos del servidor. Primero
+   * busca en estudiantes; si no hay match, busca en docentes — mismo flujo
+   * de identificación para ambos roles, sin pantalla de login separada.
    * Webhook real esperado: POST {n8nBaseUrl}/consultar-estudiante  body: { cedula }
    */
-  consultarPorCedula(cedula: string): Observable<Estudiante | null> {
+  consultarPorCedula(cedula: string): Observable<Usuario | null> {
     if (environment.usarMock) {
-      const encontrado = ESTUDIANTES_MOCK.find(e => e.cedula === cedula) ?? null;
+      const encontrado = this.buscarUsuarioMock(cedula) ?? null;
       return of(encontrado).pipe(delay(900));
     }
 
     return this.http
-      .post<Estudiante>(`${environment.n8nBaseUrl}/consultar-estudiante`, { cedula })
-      .pipe(map(estudiante => estudiante ?? null));
+      .post<Usuario>(`${environment.n8nBaseUrl}/consultar-estudiante`, { cedula })
+      .pipe(map(usuario => usuario ?? null));
   }
 
   /**
    * Equivale al webhook de n8n que genera un ticket de verificación de 6
-   * dígitos y lo envía al correo institucional del estudiante.
+   * dígitos y lo envía al correo institucional del usuario (estudiante o
+   * docente).
    * Webhook real esperado: POST {n8nBaseUrl}/enviar-ticket-verificacion  body: { cedula }
    */
   enviarTicketVerificacion(cedula: string): Observable<EnvioTicketVerificacion> {
     if (environment.usarMock) {
-      const estudiante = ESTUDIANTES_MOCK.find(e => e.cedula === cedula);
-      if (!estudiante) {
-        return throwError(() => new Error('Estudiante no encontrado'));
+      const usuario = this.buscarUsuarioMock(cedula);
+      if (!usuario) {
+        return throwError(() => new Error('Usuario no encontrado'));
       }
 
       const ticket = Math.floor(100000 + Math.random() * 900000).toString();
       this.ticketsVerificacionMock.set(cedula, ticket);
 
       return of({
-        correoEnmascarado: this.enmascararCorreo(estudiante.correoInstitucional),
+        correoEnmascarado: this.enmascararCorreo(usuario.correoInstitucional),
         ticketDebugSoloMock: ticket
       }).pipe(delay(900));
     }
@@ -182,6 +210,7 @@ export class EstudianteService {
         carrera: estudiante.carrera,
         nivel: estudiante.nivel,
         periodoActual: estudiante.periodoActual,
+        modalidad: 'DUAL',
         fechaEmision: new Date().toLocaleDateString('es-EC', {
           year: 'numeric',
           month: 'long',
@@ -209,23 +238,124 @@ export class EstudianteService {
     );
   }
 
+  /**
+   * Envía el PDF real del certificado (generado en el navegador con
+   * certificado-pdf.service.ts) al backend, para que n8n lo adjunte y lo
+   * envíe por correo al estudiante.
+   * Webhook real esperado: POST {n8nBaseUrl}/enviar-certificado-pdf
+   * body: { cedula, codigoUnico, pdfBase64 }
+   */
+  enviarCertificadoPdf(cedula: string, codigoUnico: string, pdfBase64: string): Observable<void> {
+    if (environment.usarMock) {
+      return of(undefined).pipe(delay(600));
+    }
+
+    return this.http
+      .post<{ enviado: boolean }>(`${environment.n8nBaseUrl}/enviar-certificado-pdf`, {
+        cedula,
+        codigoUnico,
+        pdfBase64
+      })
+      .pipe(map(() => undefined));
+  }
+
+  /**
+   * Equivale al webhook de n8n que registra un ticket de solicitud genérico
+   * (Anulación de Matrícula y cualquier trámite sin automatización propia).
+   * Webhook real esperado: POST {n8nBaseUrl}/crear-ticket-solicitud
+   * body: { cedula, tipoTramite }
+   */
+  crearTicketSolicitud(cedula: string, tipoTramite: 'ANULACION_MATRICULA'): Observable<TicketSolicitud> {
+    if (environment.usarMock) {
+      const estudiante = ESTUDIANTES_MOCK.find(e => e.cedula === cedula);
+      if (!estudiante) {
+        return throwError(() => new Error('Estudiante no encontrado'));
+      }
+
+      const anio = new Date().getFullYear();
+      const seq  = String(Math.floor(Math.random() * 900000) + 100000);
+      const ticket: TicketSolicitud = {
+        id: `TCK-${anio}-${seq}`,
+        tipo: 'Anulación de Matrícula',
+        estado: 'EN_PROCESO',
+        fechaSolicitud: new Date().toLocaleDateString('es-EC', {
+          year: 'numeric', month: 'long', day: '2-digit'
+        })
+      };
+
+      this.registrarTicket(cedula, ticket);
+      return of(ticket).pipe(delay(1000));
+    }
+
+    return this.http.post<TicketSolicitud>(
+      `${environment.n8nBaseUrl}/crear-ticket-solicitud`,
+      { cedula, tipoTramite }
+    );
+  }
+
+  /**
+   * Equivale al webhook de n8n que devuelve el catálogo de laboratorios,
+   * para que el docente elija cuál reportar.
+   * Webhook real esperado: POST {n8nBaseUrl}/consultar-laboratorios
+   */
+  consultarLaboratorios(): Observable<Laboratorio[]> {
+    if (environment.usarMock) {
+      return of(LABORATORIOS_MOCK).pipe(delay(500));
+    }
+
+    return this.http.post<Laboratorio[]>(`${environment.n8nBaseUrl}/consultar-laboratorios`, {});
+  }
+
+  /**
+   * Equivale al webhook de n8n que registra una incidencia de laboratorio
+   * reportada por un docente. La foto es opcional (base64 sin el prefijo
+   * data:, igual que el PDF del certificado) — n8n la guarda en disco y la
+   * vincula en `alertas.adjunto_id`.
+   * Webhook real esperado: POST {n8nBaseUrl}/reportar-incidencia-laboratorio
+   * body: { cedula, laboratorioCodigo, descripcion, fotoBase64?, fotoMime? }
+   */
+  reportarIncidenciaLaboratorio(
+    cedula: string,
+    laboratorioCodigo: string,
+    descripcion: string,
+    foto?: { base64: string; mime: string }
+  ): Observable<IncidenciaLaboratorio> {
+    if (environment.usarMock) {
+      const laboratorio = LABORATORIOS_MOCK.find(l => l.codigo === laboratorioCodigo);
+      const anio = new Date().getFullYear();
+      const seq = String(Math.floor(Math.random() * 900000) + 100000);
+      const incidencia: IncidenciaLaboratorio = {
+        codigo: `AL-${anio}-${seq}`,
+        laboratorio: laboratorio?.nombre ?? laboratorioCodigo,
+        descripcion,
+        estado: 'Pendiente',
+        fechaReporte: new Date().toLocaleDateString('es-EC', {
+          year: 'numeric', month: 'long', day: '2-digit'
+        }),
+        tieneFoto: !!foto
+      };
+      return of(incidencia).pipe(delay(1000));
+    }
+
+    return this.http.post<IncidenciaLaboratorio>(
+      `${environment.n8nBaseUrl}/reportar-incidencia-laboratorio`,
+      {
+        cedula,
+        laboratorioCodigo,
+        descripcion,
+        ...(foto ? { fotoBase64: foto.base64, fotoMime: foto.mime } : {})
+      }
+    );
+  }
+
+  private buscarUsuarioMock(cedula: string): Usuario | undefined {
+    return ESTUDIANTES_MOCK.find(e => e.cedula === cedula) ??
+      DOCENTES_MOCK.find(d => d.cedula === cedula);
+  }
+
   private obtenerOSembrarTickets(cedula: string): TicketSolicitud[] {
     if (!this.ticketsSolicitudMock.has(cedula)) {
-      const anio = new Date().getFullYear();
-      this.ticketsSolicitudMock.set(cedula, [
-        {
-          id: `TCK-${anio}-000123`,
-          tipo: 'Récord Académico',
-          estado: 'EN_PROCESO',
-          fechaSolicitud: '10 de julio de 2026'
-        },
-        {
-          id: `TCK-${anio}-000098`,
-          tipo: 'Certificado de Vinculación',
-          estado: 'RECHAZADO',
-          fechaSolicitud: '02 de julio de 2026'
-        }
-      ]);
+      this.ticketsSolicitudMock.set(cedula, []);
     }
     return this.ticketsSolicitudMock.get(cedula)!;
   }

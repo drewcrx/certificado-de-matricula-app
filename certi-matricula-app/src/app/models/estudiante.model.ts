@@ -1,4 +1,5 @@
 export interface Estudiante {
+  tipoUsuario: 'ESTUDIANTE';
   cedula: string;
   nombres: string;
   apellidos: string;
@@ -7,6 +8,34 @@ export interface Estudiante {
   nivel: string;
   periodoActual: string;
   estadoMatricula: 'MATRICULADO' | 'NO_MATRICULADO';
+}
+
+/**
+ * Segunda identidad que puede iniciar el mismo flujo del chatbot (cédula +
+ * OTP por correo) — no tiene una pantalla de login separada, se identifica
+ * automáticamente por no encontrarse en `estudiantes` pero sí en `docentes`.
+ */
+export interface Docente {
+  tipoUsuario: 'DOCENTE';
+  cedula: string;
+  nombres: string;
+  correoInstitucional: string;
+}
+
+export type Usuario = Estudiante | Docente;
+
+export interface Laboratorio {
+  codigo: string;
+  nombre: string;
+}
+
+export interface IncidenciaLaboratorio {
+  codigo: string;
+  laboratorio: string;
+  descripcion: string;
+  estado: string;
+  fechaReporte: string;
+  tieneFoto: boolean;
 }
 
 export interface EnvioTicketVerificacion {
@@ -22,16 +51,16 @@ export interface CertificadoMatricula {
   carrera: string;
   nivel: string;
   periodoActual: string;
+  modalidad: string;
   fechaEmision: string;
   urlVerificacion: string;
 }
 
 export type OpcionMenu =
   | 'CERTIFICADO_MATRICULA'
-  | 'RECORD_ACADEMICO'
-  | 'CERTIFICADO_VINCULACION'
   | 'ANULACION_MATRICULA'
   | 'ESTADO_TICKETS'
+  | 'REPORTAR_INCIDENCIA_LAB'
   | 'FINALIZAR_CONVERSACION';
 
 export interface OpcionChat {

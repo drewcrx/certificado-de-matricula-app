@@ -3,43 +3,110 @@
   "nodes": [
     {
       "parameters": {
-        "content": "## Enviar ticket de verificación\n- Busca al estudiante para obtener su correoInstitucional.\n- Genera un ticket de 6 dígitos y lo guarda en `tickets_verificacion` con expiración (ej. 10 min).\n- Envía el ticket por correo (nodo Send Email / SMTP — configúralo con las credenciales reales del correo institucional).\n- Responde solo con el correo enmascarado, NUNCA con el ticket real, en producción.\n- Ajusta el nodo Postgres al motor real de base de datos.",
-        "height": 260,
-        "width": 340
+        "content": "## Enviar ticket de verificación (esquema REAL)\n- Primero busca en `estudiantes`; si no hay match, busca en `docentes` (misma cédula, segunda identidad). \"Generar Ticket\" es genérico (usa spread de $json), por eso sirve para ambos sin cambios.\n- estudiantes.correo / docentes.correo (no correo_institucional), sin columna apellidos.\n- El ticket se GUARDA HASHEADO con pgcrypto: encode(digest(ticket, 'sha256'), 'hex') en otp_codigos.codigo_hash. Nunca se guarda en texto plano.\n- canal = 'chatbot' (valor válido del CHECK de otp_codigos).\n- Expira en 10 minutos (elegido para esta instancia independiente; el otp.expiracion_min=5 del dump pertenece al otro sistema/panel).\n- Configura credenciales SMTP reales (o Mailtrap para pruebas) en el nodo de correo.\n- Incluye manejo de preflight CORS (OPTIONS).",
+        "height": 300,
+        "width": 380
       },
       "id": "c1111111-1111-4111-8111-111111111111",
       "name": "Nota",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
-      "position": [-220, -60]
+      "position": [
+        -220,
+        -160
+      ]
     },
     {
       "parameters": {
         "httpMethod": "POST",
         "path": "enviar-ticket-verificacion",
         "responseMode": "responseNode",
-        "options": {}
+        "options": {},
+        "authentication": "headerAuth"
       },
       "id": "c2222222-2222-4222-8222-222222222222",
       "name": "Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [200, 0],
-      "webhookId": "enviar-ticket-verificacion"
+      "position": [
+        200,
+        0
+      ],
+      "webhookId": "enviar-ticket-verificacion",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REEMPLAZAR",
+          "name": "REEMPLAZAR con credencial Header Auth (X-Api-Key)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "OPTIONS",
+        "path": "enviar-ticket-verificacion",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "caaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      "name": "Webhook (OPTIONS)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        200,
+        320
+      ],
+      "webhookId": "enviar-ticket-verificacion-options"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "",
+        "options": {
+          "responseCode": 204,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              },
+              {
+                "name": "Access-Control-Allow-Methods",
+                "value": "POST, OPTIONS"
+              },
+              {
+                "name": "Access-Control-Allow-Headers",
+                "value": "Content-Type, X-Api-Key"
+              }
+            ]
+          }
+        }
+      },
+      "id": "cbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      "name": "Responder: CORS preflight",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        460,
+        320
+      ]
     },
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT cedula, nombres, apellidos, correo_institucional AS \"correoInstitucional\" FROM estudiantes WHERE cedula = $1",
-        "additionalFields": {
-          "queryParams": "={{ $json.body.cedula }}"
+        "resource": "database",
+        "query": "SELECT cedula, nombres, correo AS \"correoInstitucional\" FROM estudiantes WHERE cedula = $1",
+        "options": {
+          "queryReplacement": "={{ [ $json.body.cedula ] }}"
         }
       },
       "id": "c3333333-3333-4333-8333-333333333333",
       "name": "Buscar Estudiante (Postgres)",
       "type": "n8n-nodes-base.postgres",
-      "typeVersion": 1,
-      "position": [460, 0],
+      "typeVersion": 2.6,
+      "position": [
+        460,
+        0
+      ],
       "alwaysOutputData": true,
       "credentials": {
         "postgres": {
@@ -75,31 +142,41 @@
       "name": "¿Existe el estudiante?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [720, 0]
+      "position": [
+        720,
+        0
+      ]
     },
     {
       "parameters": {
-        "jsCode": "const ticket = Math.floor(100000 + Math.random() * 900000).toString();\n\nconst usuario = $json.correoInstitucional.split('@')[0];\nconst dominio = $json.correoInstitucional.split('@')[1];\nconst visible = usuario.slice(0, 2);\nconst correoEnmascarado = `${visible}${'*'.repeat(Math.max(usuario.length - 2, 3))}@${dominio}`;\n\n// Expira en 10 minutos\nconst expiraEn = new Date(Date.now() + 10 * 60 * 1000).toISOString();\n\nreturn [{\n  json: {\n    ...$json,\n    ticket,\n    correoEnmascarado,\n    expiraEn\n  }\n}];"
+        "jsCode": "const ticket = Math.floor(100000 + Math.random() * 900000).toString();\n\nconst usuario = $json.correoInstitucional.split('@')[0];\nconst dominio = $json.correoInstitucional.split('@')[1];\nconst visible = usuario.slice(0, 2);\nconst correoEnmascarado = `${visible}${'*'.repeat(Math.max(usuario.length - 2, 3))}@${dominio}`;\n\nreturn [{\n  json: {\n    ...$json,\n    ticket,\n    correoEnmascarado\n  }\n}];"
       },
       "id": "c5555555-5555-4555-8555-555555555555",
       "name": "Generar Ticket",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [980, -120]
+      "position": [
+        980,
+        -120
+      ]
     },
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "INSERT INTO tickets_verificacion (cedula, ticket, expira_en) VALUES ($1, $2, $3)",
-        "additionalFields": {
-          "queryParams": "={{ [$json.cedula, $json.ticket, $json.expiraEn] }}"
+        "resource": "database",
+        "query": "INSERT INTO otp_codigos (cedula, correo, codigo_hash, canal, expira_en) VALUES ($1, $2, encode(digest($3, 'sha256'), 'hex'), 'chatbot', NOW() + INTERVAL '10 minutes')",
+        "options": {
+          "queryReplacement": "={{ [$json.cedula, $json.correoInstitucional, $json.ticket] }}"
         }
       },
       "id": "c6666666-6666-4666-8666-666666666666",
       "name": "Guardar Ticket (Postgres)",
       "type": "n8n-nodes-base.postgres",
-      "typeVersion": 1,
-      "position": [1240, -120],
+      "typeVersion": 2.6,
+      "position": [
+        1240,
+        -120
+      ],
       "credentials": {
         "postgres": {
           "id": "REEMPLAZAR",
@@ -110,50 +187,133 @@
     {
       "parameters": {
         "fromEmail": "no-responder@yavirac.edu.ec",
-        "toEmail": "={{ $json.correoInstitucional }}",
-        "subject": "Tu ticket de verificación - Yavirac",
+        "toEmail": "={{ $('Generar Ticket').item.json.correoInstitucional }}",
+        "subject": "Tu ticket de verificación - YaviBot",
         "emailFormat": "text",
-        "text": "={{ \"Hola \" + $json.nombres + \",\\n\\nTu ticket de verificación es: \" + $json.ticket + \"\\n\\nEste ticket expira en 10 minutos. Si no lo solicitaste, ignora este correo.\" }}"
+        "text": "={{ \"Hola \" + $('Generar Ticket').item.json.nombres + \",\\n\\nTu ticket de verificación es: \" + $('Generar Ticket').item.json.ticket + \"\\n\\nEste ticket expira en 10 minutos. Si no lo solicitaste, ignora este correo.\" }}"
       },
       "id": "c7777777-7777-4777-8777-777777777777",
       "name": "Enviar Correo (SMTP)",
       "type": "n8n-nodes-base.emailSend",
       "typeVersion": 2.1,
-      "position": [1500, -120],
+      "position": [
+        1500,
+        -120
+      ],
+      "notes": "Para pruebas: configurar credenciales SMTP de Mailtrap (Settings > Credentials > SMTP, con el host/puerto/usuario/password del sandbox de Mailtrap). Reemplazar id REEMPLAZAR.",
       "credentials": {
         "smtp": {
           "id": "REEMPLAZAR",
-          "name": "REEMPLAZAR con credenciales SMTP reales"
+          "name": "REEMPLAZAR con credenciales SMTP (Mailtrap en pruebas)"
         }
       }
     },
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ { \"correoEnmascarado\": $json.correoEnmascarado } }}",
+        "responseBody": "={{ { \"correoEnmascarado\": $('Generar Ticket').item.json.correoEnmascarado } }}",
         "options": {
-          "responseCode": 200
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
         }
       },
       "id": "c8888888-8888-4888-8888-888888888888",
       "name": "Responder: Ticket enviado",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [1760, -120]
+      "position": [
+        1760,
+        -120
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "resource": "database",
+        "query": "SELECT cedula, nombre_docente AS nombres, correo AS \"correoInstitucional\" FROM docentes WHERE cedula = $1",
+        "options": {
+          "queryReplacement": "={{ [ $('Webhook').item.json.body.cedula ] }}"
+        }
+      },
+      "id": "cddddddd-dddd-4ddd-8ddd-ddddddddddd1",
+      "name": "Buscar Docente (Postgres)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        980,
+        60
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "REEMPLAZAR",
+          "name": "REEMPLAZAR con credenciales reales"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "cond1",
+              "leftValue": "={{ $json.correoInstitucional }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "cddddddd-dddd-4ddd-8ddd-ddddddddddd2",
+      "name": "¿Existe el docente?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1240,
+        60
+      ]
     },
     {
       "parameters": {
         "respondWith": "json",
         "responseBody": "={{ { \"error\": \"Estudiante no encontrado.\" } }}",
         "options": {
-          "responseCode": 404
+          "responseCode": 404,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
         }
       },
       "id": "c9999999-9999-4999-8999-999999999999",
       "name": "Responder: No encontrado",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [980, 160]
+      "position": [
+        1500,
+        160
+      ]
     }
   ],
   "connections": {
@@ -162,6 +322,17 @@
         [
           {
             "node": "Buscar Estudiante (Postgres)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook (OPTIONS)": {
+      "main": [
+        [
+          {
+            "node": "Responder: CORS preflight",
             "type": "main",
             "index": 0
           }
@@ -180,6 +351,35 @@
       ]
     },
     "¿Existe el estudiante?": {
+      "main": [
+        [
+          {
+            "node": "Generar Ticket",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Buscar Docente (Postgres)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Docente (Postgres)": {
+      "main": [
+        [
+          {
+            "node": "¿Existe el docente?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Existe el docente?": {
       "main": [
         [
           {
@@ -234,5 +434,6 @@
   "pinData": {},
   "settings": {
     "executionOrder": "v1"
-  }
+  },
+  "active": true
 }

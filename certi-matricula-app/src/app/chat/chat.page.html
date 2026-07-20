@@ -98,10 +98,99 @@
             <img [src]="m.qrDataUrl" alt="Código QR único del certificado" />
             <span class="codigo-qr">{{ m.certificado?.codigoUnico }}</span>
           </div>
-          <ion-button expand="block" fill="outline" size="small" (click)="compartirCertificado(m)">
-            <ion-icon slot="start" name="share-outline"></ion-icon>
-            Compartir / Descargar
-          </ion-button>
+          <div class="aviso-correo">
+            <ion-icon name="mail-outline"></ion-icon>
+            <span>El certificado ha sido enviado a tu correo institucional.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="fila fila-bot" *ngIf="m.tipo === 'bot-confirmacion-anulacion'">
+        <div class="avatar-mini">
+          <img src="assets/icon/yavibot-avatar.png" alt="YaviBot" />
+        </div>
+        <div class="tarjeta tarjeta-anulacion">
+          <div class="encabezado-anulacion">
+            <ion-icon name="close-circle-outline"></ion-icon>
+            <span>SOLICITUD DE ANULACIÓN DE MATRÍCULA</span>
+          </div>
+          <ul>
+            <li><strong>Estudiante:</strong> {{ m.estudiante?.nombres }} {{ m.estudiante?.apellidos }}</li>
+            <li><strong>Cédula:</strong> {{ m.estudiante?.cedula }}</li>
+            <li><strong>Carrera:</strong> {{ m.estudiante?.carrera }}</li>
+            <li><strong>Nivel:</strong> {{ m.estudiante?.nivel }}</li>
+            <li><strong>Periodo a anular:</strong> {{ m.estudiante?.periodoActual }}</li>
+          </ul>
+          <p class="aviso-anulacion">
+            <ion-icon name="warning-outline"></ion-icon>
+            Esta solicitud será procesada por Secretaría en 3 a 5 días hábiles. Recibirás una confirmación por correo institucional.
+          </p>
+          <div class="botones-anulacion">
+            <ion-button expand="block" color="danger" (click)="confirmarAnulacion()" [disabled]="estado === 'procesando_anulacion'">
+              <ion-icon slot="start" name="checkmark-circle-outline"></ion-icon>
+              Confirmar solicitud
+            </ion-button>
+            <ion-button expand="block" fill="outline" color="medium" (click)="cancelarAnulacion()" [disabled]="estado === 'procesando_anulacion'">
+              <ion-icon slot="start" name="arrow-back-outline"></ion-icon>
+              Cancelar
+            </ion-button>
+          </div>
+        </div>
+      </div>
+
+      <div class="fila fila-bot" *ngIf="m.tipo === 'bot-laboratorios'">
+        <div class="avatar-mini">
+          <img src="assets/icon/yavibot-avatar.png" alt="YaviBot" />
+        </div>
+        <div class="tarjeta tarjeta-opciones">
+          <ion-chip *ngFor="let lab of m.laboratorios" (click)="seleccionarLaboratorio(lab)">
+            <ion-icon name="desktop-outline"></ion-icon>
+            <ion-label>{{ lab.nombre }}</ion-label>
+          </ion-chip>
+        </div>
+      </div>
+
+      <div class="fila fila-bot" *ngIf="m.tipo === 'bot-confirmacion-incidencia'">
+        <div class="avatar-mini">
+          <img src="assets/icon/yavibot-avatar.png" alt="YaviBot" />
+        </div>
+        <div class="tarjeta tarjeta-anulacion">
+          <div class="encabezado-anulacion">
+            <ion-icon name="alert-circle-outline"></ion-icon>
+            <span>REPORTE DE INCIDENCIA DE LABORATORIO</span>
+          </div>
+          <ul>
+            <li><strong>Laboratorio:</strong> {{ m.laboratorioSeleccionado?.nombre }}</li>
+            <li><strong>Descripción:</strong> {{ m.descripcionIncidencia }}</li>
+          </ul>
+          <img *ngIf="m.fotoPreviewUrl" [src]="m.fotoPreviewUrl" alt="Foto de la incidencia" class="foto-incidencia-preview" />
+          <div class="botones-anulacion">
+            <ion-button expand="block" color="secondary" (click)="confirmarReporteIncidencia()" [disabled]="estado === 'reportando_incidencia'">
+              <ion-icon slot="start" name="checkmark-circle-outline"></ion-icon>
+              Confirmar reporte
+            </ion-button>
+            <ion-button expand="block" fill="outline" color="medium" (click)="cancelarReporteIncidencia()" [disabled]="estado === 'reportando_incidencia'">
+              <ion-icon slot="start" name="arrow-back-outline"></ion-icon>
+              Cancelar
+            </ion-button>
+          </div>
+        </div>
+      </div>
+
+      <div class="fila fila-bot" *ngIf="m.tipo === 'bot-resultado-incidencia'">
+        <div class="avatar-mini">
+          <img src="assets/icon/yavibot-avatar.png" alt="YaviBot" />
+        </div>
+        <div class="tarjeta tarjeta-tickets">
+          <h3>Reporte de incidencia</h3>
+          <div class="fila-ticket">
+            <div class="fila-ticket-encabezado">
+              <span class="ticket-id">{{ m.incidencia?.codigo }}</span>
+              <span class="ticket-estado estado-proceso">Pendiente</span>
+            </div>
+            <span class="ticket-tipo">{{ m.incidencia?.laboratorio }}</span>
+            <span class="ticket-fecha">{{ m.incidencia?.fechaReporte }}</span>
+          </div>
         </div>
       </div>
 
@@ -167,11 +256,43 @@
     <p class="error-cedula" *ngIf="errorTicket">{{ errorTicket }}</p>
   </ion-toolbar>
 
-  <ion-toolbar *ngIf="estado === 'menu' || estado === 'preview_certificado'">
-    <ion-button fill="clear" size="small" (click)="volverAlMenu()" *ngIf="estado === 'preview_certificado'">
+  <ion-toolbar *ngIf="estado === 'menu' || estado === 'preview_certificado' || estado === 'seleccionando_laboratorio'">
+    <ion-button fill="clear" size="small" (click)="volverAlMenu()" *ngIf="estado === 'preview_certificado' || estado === 'seleccionando_laboratorio'">
       <ion-icon slot="start" name="arrow-back-outline"></ion-icon>
       Volver al menú
     </ion-button>
+  </ion-toolbar>
+
+  <ion-toolbar *ngIf="estado === 'escribiendo_incidencia'">
+    <ion-item lines="none" class="input-cedula">
+      <ion-textarea
+        placeholder="Describe la incidencia..."
+        [(ngModel)]="descripcionIncidencia"
+        [autoGrow]="true"
+        rows="2">
+      </ion-textarea>
+      <ion-button slot="end" fill="clear" [disabled]="!puedeEnviarDescripcionIncidencia" (click)="enviarDescripcionIncidencia()">
+        <ion-icon slot="icon-only" name="send-outline"></ion-icon>
+      </ion-button>
+    </ion-item>
+  </ion-toolbar>
+
+  <ion-toolbar *ngIf="estado === 'adjuntando_foto'">
+    <div class="adjuntar-foto">
+      <ion-button fill="outline" size="small">
+        <ion-icon slot="start" name="camera-outline"></ion-icon>
+        Adjuntar foto
+        <input
+          type="file"
+          accept="image/jpeg,image/png"
+          capture="environment"
+          (change)="onFotoSeleccionada($event)" />
+      </ion-button>
+      <ion-button fill="clear" size="small" color="medium" (click)="continuarSinFoto()">
+        Continuar sin foto
+      </ion-button>
+    </div>
+    <p class="error-cedula" *ngIf="errorFoto">{{ errorFoto }}</p>
   </ion-toolbar>
 
   <ion-toolbar *ngIf="estado === 'resultado'">
