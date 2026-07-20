@@ -8,7 +8,6 @@ import { CertificadoPdfService } from '../services/certificado-pdf.service';
 import { validarCedulaEcuatoriana } from '../utils/validar-cedula';
 import {
   CertificadoMatricula,
-  Docente,
   Estudiante,
   IncidenciaLaboratorio,
   Laboratorio,
@@ -538,7 +537,13 @@ export class ChatPage implements OnInit {
     }
     this.errorFoto = '';
 
-    const base64 = await this.blobABase64(archivo);
+    let base64: string;
+    try {
+      base64 = await this.blobABase64(archivo);
+    } catch {
+      this.errorFoto = 'No se pudo leer la foto. Intenta con otra o continúa sin foto.';
+      return;
+    }
     this.fotoSeleccionada = { base64, mime: archivo.type, previewUrl: `data:${archivo.type};base64,${base64}` };
     this.agregarMensaje({ tipo: 'usuario-texto', texto: '📷 Foto adjuntada' });
     await this.mostrarConfirmacionIncidencia();
