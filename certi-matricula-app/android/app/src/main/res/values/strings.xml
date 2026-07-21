@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">certi-matricula-app</string>
-    <string name="title_activity_main">certi-matricula-app</string>
+    <string name="app_name">Mesa de Ayuda</string>
+    <string name="title_activity_main">Mesa de Ayuda</string>
     <string name="package_name">com.uni.certimatricula</string>
     <string name="custom_url_scheme">com.uni.certimatricula</string>
 </resources>

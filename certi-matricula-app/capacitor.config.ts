@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.uni.certimatricula',
-  appName: 'certi-matricula-app',
+  appName: 'Mesa de Ayuda',
   webDir: 'www',
   plugins: {
     SplashScreen: {
