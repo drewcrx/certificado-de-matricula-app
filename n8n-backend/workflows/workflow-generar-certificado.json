@@ -330,6 +330,87 @@
     },
     {
       "parameters": {
+        "operation": "executeQuery",
+        "resource": "database",
+        "query": "SELECT string_agg(correo, ',') AS correos FROM usuarios_panel WHERE rol_id = (SELECT id FROM roles WHERE codigo = 'RESP_CERTIFICADOS')",
+        "options": {}
+      },
+      "id": "c1111111-1111-4111-8111-111111111112",
+      "name": "Buscar Encargados de Certificados (Postgres)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2020,
+        220
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "REEMPLAZAR",
+          "name": "REEMPLAZAR con credenciales reales"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "cond1",
+              "leftValue": "={{ $json.correos }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "c2222222-2222-4222-8222-222222222223",
+      "name": "¿Hay encargados con correo?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        2280,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "no-reply@yavirac.edu.ec",
+        "toEmail": "={{ $json.correos }}",
+        "subject": "=Nuevo Certificado de Matrícula emitido — {{ $('Formatear Respuesta').item.json.cedula }}",
+        "emailFormat": "html",
+        "message": "=<div style=\"font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;\">\n  <div style=\"text-align: center; margin-bottom: 24px;\">\n    <h2 style=\"color: #1a237e; margin-top: 12px;\">Instituto Superior Tecnológico<br>de Turismo y Patrimonio \"YAVIRAC\"</h2>\n  </div>\n\n  <p>Se emitió un nuevo Certificado de Matrícula desde YaviBot:</p>\n\n  <div style=\"background: #f5f5f5; border-left: 4px solid #1a237e; padding: 16px; margin: 20px 0; border-radius: 4px;\">\n    <p style=\"margin: 4px 0;\"><strong>Código único:</strong> <code>{{ $('Formatear Respuesta').item.json.codigoUnico }}</code></p>\n    <p style=\"margin: 4px 0;\"><strong>Estudiante:</strong> {{ $('Formatear Respuesta').item.json.nombreCompleto }} (cédula {{ $('Formatear Respuesta').item.json.cedula }})</p>\n    <p style=\"margin: 4px 0;\"><strong>Carrera:</strong> {{ $('Formatear Respuesta').item.json.carrera }}, {{ $('Formatear Respuesta').item.json.nivel }}</p>\n    <p style=\"margin: 4px 0;\"><strong>Periodo:</strong> {{ $('Formatear Respuesta').item.json.periodoActual }}</p>\n    <p style=\"margin: 4px 0;\"><strong>Fecha de emisión:</strong> {{ $('Formatear Respuesta').item.json.fechaEmision }}</p>\n  </div>\n\n  <p>Este aviso es solo informativo — el certificado ya fue entregado al estudiante, no requiere ninguna acción.</p>\n\n  <hr style=\"border: none; border-top: 1px solid #ddd; margin: 24px 0;\" />\n\n  <p style=\"color: #666; font-size: 12px; text-align: center;\">\n    Este correo fue generado automáticamente por el sistema YaviBot.<br>\n    Instituto Superior Tecnológico de Turismo y Patrimonio \"YAVIRAC\" | www.yavirac.edu.ec\n  </p>\n</div>",
+        "options": {}
+      },
+      "id": "c3333333-3333-4333-8333-333333333334",
+      "name": "Enviar Aviso a Encargados (Correo)",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "onError": "continueRegularOutput",
+      "position": [
+        2540,
+        220
+      ],
+      "notes": "CONFIGURAR: credenciales SMTP. Solo informativo (no bloquea nada) — avisa a quienes tengan el rol RESP_CERTIFICADOS (hoy dos placeholders, reemplazar por los contactos reales cuando se conozcan). onError=continueRegularOutput: un fallo de correo no debe afectar la respuesta del certificado, que ya se generó.",
+      "credentials": {
+        "smtp": {
+          "id": "REEMPLAZAR",
+          "name": "REEMPLAZAR con credenciales SMTP (Mailtrap en pruebas)"
+        }
+      }
+    },
+    {
+      "parameters": {
         "respondWith": "json",
         "responseBody": "={{ { \"error\": \"El estudiante no existe o no está matriculado en el periodo actual.\" } }}",
         "options": {
@@ -475,8 +556,36 @@
             "node": "Responder: Certificado nuevo",
             "type": "main",
             "index": 0
+          },
+          {
+            "node": "Buscar Encargados de Certificados (Postgres)",
+            "type": "main",
+            "index": 0
           }
         ]
+      ]
+    },
+    "Buscar Encargados de Certificados (Postgres)": {
+      "main": [
+        [
+          {
+            "node": "¿Hay encargados con correo?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Hay encargados con correo?": {
+      "main": [
+        [
+          {
+            "node": "Enviar Aviso a Encargados (Correo)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
       ]
     }
   },

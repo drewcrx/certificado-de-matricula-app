@@ -138,6 +138,37 @@
         </div>
       </div>
 
+      <div class="fila fila-bot" *ngIf="m.tipo === 'bot-confirmacion-reseteo'">
+        <div class="avatar-mini">
+          <img src="assets/icon/yavibot-avatar.png" alt="YaviBot" />
+        </div>
+        <div class="tarjeta tarjeta-anulacion">
+          <div class="encabezado-anulacion">
+            <ion-icon name="key-outline"></ion-icon>
+            <span>RESETEO DE CONTRASEÑA DE CORREO INSTITUCIONAL</span>
+          </div>
+          <ul>
+            <li><strong>Estudiante:</strong> {{ m.estudiante?.nombres }} {{ m.estudiante?.apellidos }}</li>
+            <li><strong>Cédula:</strong> {{ m.estudiante?.cedula }}</li>
+            <li><strong>Correo institucional:</strong> {{ m.estudiante?.correoInstitucional }}</li>
+          </ul>
+          <p class="aviso-anulacion">
+            <ion-icon name="information-circle-outline"></ion-icon>
+            El reseteo es inmediato. Recibirás tu nueva contraseña temporal en tu correo institucional apenas confirmes.
+          </p>
+          <div class="botones-anulacion">
+            <ion-button expand="block" color="secondary" (click)="confirmarReseteoCorreo()" [disabled]="estado === 'procesando_reseteo_correo'">
+              <ion-icon slot="start" name="checkmark-circle-outline"></ion-icon>
+              Confirmar solicitud
+            </ion-button>
+            <ion-button expand="block" fill="outline" color="medium" (click)="cancelarReseteoCorreo()" [disabled]="estado === 'procesando_reseteo_correo'">
+              <ion-icon slot="start" name="arrow-back-outline"></ion-icon>
+              Cancelar
+            </ion-button>
+          </div>
+        </div>
+      </div>
+
       <div class="fila fila-bot" *ngIf="m.tipo === 'bot-laboratorios'">
         <div class="avatar-mini">
           <img src="assets/icon/yavibot-avatar.png" alt="YaviBot" />

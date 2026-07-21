@@ -10,6 +10,7 @@ import {
   Estudiante,
   IncidenciaLaboratorio,
   Laboratorio,
+  ResultadoReseteoCorreo,
   TicketSolicitud,
   Usuario
 } from '../models/estudiante.model';
@@ -265,7 +266,10 @@ export class EstudianteService {
    * Webhook real esperado: POST {n8nBaseUrl}/crear-ticket-solicitud
    * body: { cedula, tipoTramite }
    */
-  crearTicketSolicitud(cedula: string, tipoTramite: 'ANULACION_MATRICULA'): Observable<TicketSolicitud> {
+  crearTicketSolicitud(
+    cedula: string,
+    tipoTramite: 'ANULACION_MATRICULA'
+  ): Observable<TicketSolicitud> {
     if (environment.usarMock) {
       const estudiante = ESTUDIANTES_MOCK.find(e => e.cedula === cedula);
       if (!estudiante) {
@@ -290,6 +294,33 @@ export class EstudianteService {
     return this.http.post<TicketSolicitud>(
       `${environment.n8nBaseUrl}/crear-ticket-solicitud`,
       { cedula, tipoTramite }
+    );
+  }
+
+  /**
+   * Reseteo AUTOMÁTICO de la contraseña del correo institucional — sin
+   * ticket, sin aprobación humana. El backend valida del lado del servidor
+   * que el estudiante haya pasado por el OTP recientemente antes de
+   * ejecutar el reseteo real contra Google Workspace.
+   * Webhook real esperado: POST {n8nBaseUrl}/resetear-contrasena-correo
+   */
+  resetearContrasenaCorreo(cedula: string): Observable<ResultadoReseteoCorreo> {
+    if (environment.usarMock) {
+      const estudiante = ESTUDIANTES_MOCK.find(e => e.cedula === cedula);
+      if (!estudiante) {
+        return throwError(() => new Error('Estudiante no encontrado'));
+      }
+      const resultado: ResultadoReseteoCorreo = {
+        estado: 'RESETEADO',
+        correoNotificado: estudiante.correoInstitucional,
+        mensaje: 'Tu contraseña fue reseteada. Revisa tu correo institucional para ver la nueva contraseña temporal.'
+      };
+      return of(resultado).pipe(delay(1000));
+    }
+
+    return this.http.post<ResultadoReseteoCorreo>(
+      `${environment.n8nBaseUrl}/resetear-contrasena-correo`,
+      { cedula }
     );
   }
 

@@ -364,7 +364,7 @@
       "parameters": {
         "operation": "executeQuery",
         "resource": "database",
-        "query": "SELECT correo AS \"correoResponsable\", nombres AS \"nombreResponsable\" FROM usuarios_panel WHERE id = $1",
+        "query": "SELECT string_agg(correo, ',') AS \"correoResponsable\", string_agg(nombres, ', ') AS \"nombreResponsable\" FROM usuarios_panel WHERE rol_id = (SELECT rol_id FROM usuarios_panel WHERE id = $1)",
         "options": {
           "queryReplacement": "={{ [ $json.responsable_id ] }}"
         }

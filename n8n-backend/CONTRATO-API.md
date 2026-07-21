@@ -244,11 +244,19 @@ Reglas importantes para el backend:
   para `CERT_MATRICULA`, así que el certificado de matrícula nunca aparece en
   "Consultar estado de mis tickets" (endpoint 5); se rastrea únicamente vía
   `certificados`/`qr_codigos`.
-- **Este endpoint YA NO envía el correo.** Solo crea el registro y devuelve
-  los datos. El PDF real (con el membrete oficial) lo genera la app en el
-  navegador con `certificado-pdf.service.ts`, y luego lo envía al endpoint
-  `/enviar-certificado-pdf` (ver §4.1) para que n8n lo adjunte y lo mande por
-  correo. Ver también §7.1.
+- **Este endpoint YA NO envía el correo al estudiante.** Solo crea el
+  registro y devuelve los datos. El PDF real (con el membrete oficial) lo
+  genera la app en el navegador con `certificado-pdf.service.ts`, y luego lo
+  envía al endpoint `/enviar-certificado-pdf` (ver §4.1) para que n8n lo
+  adjunte y lo mande por correo. Ver también §7.1.
+- **Aviso informativo a los encargados de certificados**: cada vez que se
+  crea un certificado **nuevo** (no en la re-consulta de uno existente por
+  idempotencia), el workflow envía un correo informativo a quienes tengan el
+  rol `RESP_CERTIFICADOS` en `usuarios_panel` (hoy dos contactos placeholder,
+  pendientes de reemplazar por los reales). Es solo informativo — no bloquea
+  ni depende de nada; si falla el envío, la respuesta al webhook no se ve
+  afectada (`onError: continueRegularOutput`, mismo patrón que el resto de
+  notificaciones del proyecto).
 
 ### Response — 400 (no matriculado / cédula inválida)
 
@@ -354,9 +362,16 @@ Endpoint para registrar la solicitud de anulación de matrícula. Solo registra
 el ticket en estado `EN_PROCESO`; lo resuelve manualmente el personal
 administrativo (fuera del alcance de esta app).
 
-> Este es el **único trámite manual** implementado en la app. Récord
-> Académico y Certificado de Vinculación están fuera del alcance del
-> proyecto y no se exponen en el menú.
+> Este es el **único trámite manual (basado en ticket)** implementado en la
+> app. Récord Académico y Certificado de Vinculación están fuera del
+> alcance del proyecto y no se exponen en el menú. El Reseteo de Contraseña
+> de Correo Institucional **ya no usa este endpoint** — es 100% automático,
+> ver §6.1. El catálogo `tipos_solicitud` renombró el código viejo a
+> `RESET_CORREO_LEGACY_DEPRECADO` específicamente para que este endpoint
+> **no pueda volver a crear un ticket de reseteo** aunque alguien lo llame
+> directo con `tipoTramite: "RESET_CORREO"` (responde 400, verificado con
+> curl) — el ticket histórico `TK-000005` de antes del cambio queda intacto,
+> solo se bloquearon los nuevos.
 
 **POST** `/crear-ticket-solicitud`
 
@@ -369,11 +384,11 @@ administrativo (fuera del alcance de esta app).
 }
 ```
 
-`tipoTramite` debe ser `ANULACION_MATRICULA`. Es el único trámite manual
-que expone la app actualmente. El workflow también asigna automáticamente
-un `responsable_id` (vía `asignaciones_responsables`) y registra los
-eventos `TicketCreado`/`TicketAsignado` en la tabla `eventos`, igual que
-hace el resto del sistema real, para que el panel administrativo se entere.
+`tipoTramite` debe ser `ANULACION_MATRICULA` — cualquier otro valor responde
+400. El workflow también asigna automáticamente un `responsable_id` (vía
+`asignaciones_responsables`) y registra los eventos
+`TicketCreado`/`TicketAsignado` en la tabla `eventos`, igual que hace el
+resto del sistema real, para que el panel administrativo se entere.
 
 **Idempotencia:** si el estudiante ya tiene un ticket **activo** (`estado`
 `Pendiente` o `En Proceso`) del mismo tipo de trámite, el workflow **no crea
@@ -416,6 +431,74 @@ se confirme con la coordinación académica.
   "error": "Tipo de trámite no reconocido."
 }
 ```
+
+---
+
+## 6.1 Resetear contraseña de correo institucional (automático)
+
+**A diferencia de todos los demás trámites manuales, este es 100%
+automático** — no crea ticket, no requiere aprobación humana. Ver
+`PROPUESTA-RESET-CORREO-AUTOMATICO.md` para el diseño completo y las
+razones del cambio (requerimiento específico de la tutora).
+
+**POST** `/resetear-contrasena-correo`
+
+### Request
+
+```json
+{ "cedula": "0102030405" }
+```
+
+### Response — 200 OK
+
+```json
+{
+  "estado": "RESETEADO",
+  "correoNotificado": "andrew.carrera@yavirac.edu.ec",
+  "mensaje": "Tu contraseña fue reseteada. Revisa tu correo institucional para ver la nueva contraseña temporal."
+}
+```
+
+La nueva contraseña **nunca** viaja en esta respuesta — solo se envía por
+correo institucional (ver workflow).
+
+### Response — 403 (no verificó su identidad recientemente)
+
+```json
+{ "error": "Debes verificar tu identidad nuevamente antes de continuar." }
+```
+
+El backend exige que el estudiante haya validado su OTP (`/verificar-ticket`)
+en los últimos 20 minutos — reutiliza `otp_codigos.usado` en vez de crear un
+mecanismo de sesión nuevo. Sin esta prueba, cualquiera que conociera la
+cédula de un estudiante podría resetear su correo sin haber pasado por el
+OTP; con esto, no.
+
+### Response — 404 (cédula no encontrada)
+
+```json
+{ "error": "Estudiante no encontrado." }
+```
+
+### Response — 429 (ya reseteó hace poco)
+
+```json
+{ "error": "Ya reseteaste tu contraseña recientemente. Intenta de nuevo en unos minutos." }
+```
+
+Cooldown de 15 minutos entre reseteos exitosos por cédula, para no saturar
+la cuenta de servicio de Google ni permitir abuso.
+
+### Response — 502 (falló el proveedor de identidad)
+
+```json
+{ "error": "No se pudo completar el reseteo en este momento. Intenta más tarde." }
+```
+
+Esta respuesta **no crea nada** en la base de datos — el estudiante
+simplemente reintenta desde el chat. Es el estado esperado mientras la
+credencial real de Google Workspace no esté configurada en n8n (ver
+`PROPUESTA-RESET-CORREO-AUTOMATICO.md` §5).
 
 ---
 

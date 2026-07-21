@@ -59,6 +59,7 @@ workflows/
   workflow-crear-ticket-solicitud.json         # dominio: trámites/tickets (genérico, estudiante)
   workflow-generar-certificado.json            # dominio: trámites/tickets (especializado, estudiante)
   workflow-enviar-certificado-pdf.json         # dominio: trámites/tickets (adjunto PDF por correo)
+  workflow-resetear-contrasena-correo.json     # dominio: trámites (especializado, automático, estudiante)
   workflow-consultar-laboratorios.json         # dominio: rol Docente (catálogo)
   workflow-reportar-incidencia-laboratorio.json # dominio: rol Docente (incidencia + foto opcional)
 ```
@@ -95,7 +96,7 @@ envelope `{success, data}`) por consistencia con lo ya construido:
 
 ## Seguridad
 
-- **Autenticación del webhook — ✅ implementado.** Los 9 workflows con
+- **Autenticación del webhook — ✅ implementado.** Los 10 workflows con
   Webhook usan Header Auth (`X-Api-Key`) como credencial del propio nodo
   Webhook — sin el header correcto, n8n responde 403 antes de ejecutar
   cualquier lógica. La app la agrega automáticamente vía
@@ -142,12 +143,23 @@ administrativo), en vez de al Postgres local de Docker:
    `tickets.codigo` nullable) a la base real **antes** de conectar n8n en
    producción — coordinado con quien administre esa base, ya que es un
    esquema compartido con el otro sistema.
-5. Cambiar `usuarios_panel.correo` del responsable de prueba ("Juan Pérez")
-   por el correo institucional real de quien procese Anulación de Matrícula.
+5. Reemplazar los `usuarios_panel.correo` de prueba por los contactos reales
+   antes de ir a producción:
+   - "Juan Pérez" → responsable real de Anulación de Matrícula.
+   - "PENDIENTE ASIGNAR (Certificados 1)" y "(Certificados 2)" → los dos
+     encargados reales que deben recibir el aviso informativo cuando se
+     emite un certificado (rol `RESP_CERTIFICADOS`).
    **No aplica** para incidencias de laboratorio: la asignación en
    `asignaciones_responsables` (tipo `ALERTA_LAB`, "Carlos Ruiz",
    `carlos.ruiz@yavirac.edu.ec`) ya es la real, tomada del dump de
    producción — no es un placeholder de pruebas.
+   **Ya no aplica** el placeholder "PENDIENTE ASIGNAR (Soporte TI)": el
+   Reseteo de Contraseña dejó de ser un ticket manual (ver
+   `PROPUESTA-RESET-CORREO-AUTOMATICO.md`) — esa fila de
+   `asignaciones_responsables` quedó vestigial, ya no se usa. Lo que sí hay
+   que configurar antes de producción es la credencial real de Google
+   Workspace (Service Account con Domain-Wide Delegation) en el nodo
+   "Resetear en Google Workspace (Admin SDK)".
 6. Llevar también el volumen `uploads_data` (fotos de incidencias) al VPS y
    declarar `N8N_RESTRICT_FILE_ACCESS_TO` en su `docker-compose.yml` — sin
    esa variable, `reportar-incidencia-laboratorio` falla al intentar
@@ -176,17 +188,42 @@ reescribir la validación del estudiante otra vez.
 
 ## Trámites: automáticos vs. manuales
 
-Con el menú ya definido en la app, hay tres trámites/flujos implementados:
+Con el menú ya definido en la app, hay cuatro trámites/flujos implementados:
 
 | Trámite | Rol | Automatizado | Genera documento |
 |---|---|---|---|
 | Certificado de Matrícula | Estudiante | ✅ Sí (workflow especializado) | ✅ Sí (QR + correo, PDF opcional) |
 | Anulación de Matrícula | Estudiante | ❌ No (requiere revisión) | ❌ No |
+| Reseteo de Contraseña de Correo Institucional | Estudiante | ✅ Sí (workflow especializado) | ❌ No |
 | Reportar incidencia de laboratorio | Docente | ❌ No (requiere revisión) | ❌ No (foto opcional adjunta) |
 
 Récord Académico y Certificado de Vinculación quedaron **fuera del alcance**
 del proyecto; el modelo de datos (`tipos_solicitud`) los incluye por ser
 parte del catálogo institucional, pero la app no los expone ni los llama.
+
+### Reseteo de contraseña: automático, no un ticket
+
+Requerimiento explícito de la tutora: el estudiante, ya autenticado por
+cédula+OTP, resetea su contraseña **al instante**, sin ticket ni
+intervención humana. El diseño completo (por qué, cómo se prueba que el
+estudiante pasó por el OTP, qué API administrativa usar, auditoría, etc.)
+está en `PROPUESTA-RESET-CORREO-AUTOMATICO.md` — resumen:
+
+- Endpoint especializado `POST /resetear-contrasena-correo`
+  (`workflow-resetear-contrasena-correo.json`), **no** pasa por
+  `crear-ticket-solicitud`.
+- Prueba de sesión reciente reutilizando `otp_codigos.usado` (ventana de
+  20 min) — sin eso, responde 403. Cooldown de 15 min entre reseteos
+  exitosos (evita abuso y límites de tasa del proveedor).
+- El reseteo real se ejecuta contra **Google Workspace Admin SDK**
+  (confirmado como proveedor de correo institucional), con una credencial
+  de Service Account con Domain-Wide Delegation — pendiente de que TI del
+  instituto la genere con privilegio mínimo (rol "Reset user passwords",
+  no Super Admin). Hasta entonces el nodo queda en `REEMPLAZAR` y el
+  endpoint responde 502 en ese último paso — todo lo anterior (validación,
+  cooldown, auditoría) sí es probable hoy.
+- La contraseña nueva se envía **solo por correo**, nunca en la respuesta
+  HTTP ni en la auditoría (`eventos`, tipo `ResetCorreoEjecutado`).
 
 ---
 
@@ -273,7 +310,13 @@ incidente. Diseño:
 5. **Fase 5 (hecha)**: rol Docente — identificación compartida,
    `consultar-laboratorios`, `reportar-incidencia-laboratorio` con foto
    opcional (ver secciones "Rol Docente" y "Fotos de incidencias" arriba).
-6. **Pendiente**: sub-workflows reutilizables (`sub-validar-estudiante`),
+6. **Fase 6 (hecha, pendiente credencial real)**: Resetear Contraseña de
+   Correo Institucional pasó de ticket manual a **automático** —
+   `resetear-contrasena-correo`, prueba de sesión OTP reciente, cooldown,
+   auditoría y aviso a los encargados de certificados (ver "Reseteo de
+   contraseña: automático, no un ticket" arriba). Falta que TI del
+   instituto entregue la credencial real de Google Workspace.
+7. **Pendiente**: sub-workflows reutilizables (`sub-validar-estudiante`),
    error workflow global en n8n, rotar la `X-Api-Key` de desarrollo antes
    de producción, desplegar en el VPS institucional apuntando a la base de
    datos real (ver sección "Despliegue en producción" arriba).
@@ -286,5 +329,8 @@ incidente. Diseño:
 - `ESQUEMA-BD.md` — esquema real de PostgreSQL (todas las tablas que usa esta app).
 - `CONTRATO-API.md` — especificación endpoint por endpoint (request/response).
 - `ARRANQUE-LOCAL.md` — cómo levantar el backend local (Docker: n8n + Postgres).
+- `PROPUESTA-RESET-CORREO-AUTOMATICO.md` — propuesta (aún no implementada)
+  para que el reseteo de contraseña de correo institucional sea 100%
+  automático contra el proveedor real de identidad, sin ticket manual.
 - `workflows/` — los workflows de n8n, importables, que implementan el
   contrato.

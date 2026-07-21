@@ -27,6 +27,7 @@ type TipoMensaje =
   | 'bot-resultado-certificado'
   | 'bot-tickets'
   | 'bot-confirmacion-anulacion'
+  | 'bot-confirmacion-reseteo'
   | 'bot-laboratorios'
   | 'bot-confirmacion-incidencia'
   | 'bot-resultado-incidencia';
@@ -58,6 +59,8 @@ type EstadoConversacion =
   | 'consultando_tickets'
   | 'confirmando_anulacion'
   | 'procesando_anulacion'
+  | 'confirmando_reseteo_correo'
+  | 'procesando_reseteo_correo'
   | 'seleccionando_laboratorio'
   | 'escribiendo_incidencia'
   | 'adjuntando_foto'
@@ -68,6 +71,7 @@ type EstadoConversacion =
 const OPCIONES_MENU_ESTUDIANTE: OpcionChat[] = [
   { id: 'CERTIFICADO_MATRICULA', etiqueta: 'Solicitar Certificado de Matrícula', icono: 'document-text-outline', disponible: true },
   { id: 'ANULACION_MATRICULA', etiqueta: 'Solicitar Anulación de Matrícula', icono: 'close-circle-outline', disponible: true },
+  { id: 'RESET_CORREO', etiqueta: 'Resetear contraseña de correo institucional', icono: 'key-outline', disponible: true },
   { id: 'ESTADO_TICKETS', etiqueta: 'Consultar estado de mis tickets', icono: 'list-outline', disponible: true },
   { id: 'FINALIZAR_CONVERSACION', etiqueta: 'Finalizar conversación', icono: 'exit-outline', disponible: true }
 ];
@@ -280,6 +284,11 @@ export class ChatPage implements OnInit {
       return;
     }
 
+    if (opcion.id === 'RESET_CORREO' && this.esEstudiante(usuario)) {
+      await this.iniciarReseteoCorreo(usuario);
+      return;
+    }
+
     if (opcion.id === 'ESTADO_TICKETS' && this.esEstudiante(usuario)) {
       await this.consultarEstadoTickets(usuario);
       return;
@@ -354,6 +363,56 @@ export class ChatPage implements OnInit {
 
   async cancelarAnulacion(): Promise<void> {
     if (this.estado !== 'confirmando_anulacion') {
+      return;
+    }
+    this.agregarMensaje({ tipo: 'usuario-texto', texto: 'Cancelar' });
+    await this.hablar('Solicitud cancelada. ¿En qué más puedo ayudarte?');
+    this.agregarMensaje({ tipo: 'bot-opciones' });
+    this.estado = 'menu';
+  }
+
+  private async iniciarReseteoCorreo(estudiante: Estudiante): Promise<void> {
+    await this.hablar(
+      `Vas a resetear la contraseña de tu correo institucional ` +
+      `(${estudiante.correoInstitucional}). Se generará una nueva contraseña temporal ` +
+      `de inmediato y te la enviaremos a ese mismo correo.`
+    );
+    this.agregarMensaje({ tipo: 'bot-confirmacion-reseteo', estudiante });
+    this.estado = 'confirmando_reseteo_correo';
+  }
+
+  async confirmarReseteoCorreo(): Promise<void> {
+    if (this.estado !== 'confirmando_reseteo_correo' || !this.usuarioActual) {
+      return;
+    }
+
+    this.agregarMensaje({ tipo: 'usuario-texto', texto: 'Confirmar reseteo de contraseña' });
+    this.estado = 'procesando_reseteo_correo';
+
+    if (!(await this.requiereConexion())) {
+      this.estado = 'confirmando_reseteo_correo';
+      return;
+    }
+
+    this.mostrarEscribiendo();
+    this.estudianteService.resetearContrasenaCorreo(this.usuarioActual.cedula).subscribe({
+      next: async resultado => {
+        this.quitarEscribiendo();
+        await this.hablar(`✅ ${resultado.mensaje}`);
+        await this.hablar('¿Deseas hacer algo más?');
+        this.agregarMensaje({ tipo: 'bot-opciones' });
+        this.estado = 'menu';
+      },
+      error: async () => {
+        this.quitarEscribiendo();
+        await this.hablar('No pude completar el reseteo en este momento. Intenta nuevamente en unos segundos.');
+        this.estado = 'confirmando_reseteo_correo';
+      }
+    });
+  }
+
+  async cancelarReseteoCorreo(): Promise<void> {
+    if (this.estado !== 'confirmando_reseteo_correo') {
       return;
     }
     this.agregarMensaje({ tipo: 'usuario-texto', texto: 'Cancelar' });

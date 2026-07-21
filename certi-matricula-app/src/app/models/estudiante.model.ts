@@ -59,6 +59,7 @@ export interface CertificadoMatricula {
 export type OpcionMenu =
   | 'CERTIFICADO_MATRICULA'
   | 'ANULACION_MATRICULA'
+  | 'RESET_CORREO'
   | 'ESTADO_TICKETS'
   | 'REPORTAR_INCIDENCIA_LAB'
   | 'FINALIZAR_CONVERSACION';
@@ -77,4 +78,10 @@ export interface TicketSolicitud {
   tipo: string;
   estado: EstadoTicket;
   fechaSolicitud: string;
+}
+
+export interface ResultadoReseteoCorreo {
+  estado: 'RESETEADO';
+  correoNotificado: string;
+  mensaje: string;
 }

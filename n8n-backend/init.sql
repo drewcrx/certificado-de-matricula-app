@@ -249,14 +249,22 @@ INSERT INTO periodos_academicos (id, codigo, nombre, fecha_inicio, fecha_fin, vi
 ON CONFLICT (codigo) DO NOTHING;
 SELECT setval('periodos_academicos_id_seq', 2, true);
 
+-- El código RESET_CORREO_LEGACY_DEPRECADO existe únicamente para que
+-- /crear-ticket-solicitud NUNCA vuelva a aceptar 'RESET_CORREO' como
+-- tipoTramite (ese trámite ahora es 100% automático, sin ticket — ver
+-- workflow-resetear-contrasena-correo.json y
+-- PROPUESTA-RESET-CORREO-AUTOMATICO.md). Si alguien llamara al endpoint
+-- viejo con tipoTramite: "RESET_CORREO" a mano, debe responder 400 "Tipo
+-- de trámite no reconocido" — no crear ningún ticket.
 INSERT INTO tipos_solicitud (id, codigo, nombre, genera_ticket, ambito) OVERRIDING SYSTEM VALUE VALUES
   (1, 'CERT_MATRICULA', 'Certificado de Matrícula', false, 'ninguno'),
   (2, 'RECORD_ACADEMICO', 'Récord Académico', true, 'carrera'),
   (3, 'CERT_VINCULACION', 'Certificado de Vinculación', true, 'vinculacion'),
   (4, 'ANULACION_MATRICULA', 'Anulación de Matrícula', true, 'carrera'),
-  (5, 'ALERTA_LAB', 'Alerta de Laboratorio', true, 'laboratorio')
+  (5, 'ALERTA_LAB', 'Alerta de Laboratorio', true, 'laboratorio'),
+  (6, 'RESET_CORREO_LEGACY_DEPRECADO', 'Reseteo de Contraseña de Correo Institucional (obsoleto, ver workflow automático)', true, 'ninguno')
 ON CONFLICT (codigo) DO NOTHING;
-SELECT setval('tipos_solicitud_id_seq', 5, true);
+SELECT setval('tipos_solicitud_id_seq', 6, true);
 
 INSERT INTO configuracion_sistema (clave, valor, descripcion) VALUES
   ('institucion.nombre_oficial', 'Instituto Superior Tecnológico de Turismo y Patrimonio "YAVIRAC"', 'Razón social completa para documentos oficiales'),
@@ -269,16 +277,25 @@ INSERT INTO roles (id, codigo, nombre, descripcion) OVERRIDING SYSTEM VALUE VALU
   (1, 'PROFESOR', 'Profesor', 'Reporta incidencias de laboratorio'),
   (2, 'COORDINADOR', 'Coordinador de Carrera', 'Atiende tickets académicos de sus carreras'),
   (3, 'RESP_VINCULACION', 'Responsable de Vinculación', 'Atiende certificados de vinculación'),
-  (4, 'RESP_LABORATORIOS', 'Responsable de Laboratorios', 'Gestiona alertas de laboratorio')
+  (4, 'RESP_LABORATORIOS', 'Responsable de Laboratorios', 'Gestiona alertas de laboratorio'),
+  (5, 'RESP_CERTIFICADOS', 'Responsable de Certificados', 'Recibe aviso cuando se emite un certificado de matrícula'),
+  (6, 'SOPORTE_TI', 'Soporte Técnico / TI', 'Gestiona reseteos de contraseña de correo institucional')
 ON CONFLICT (codigo) DO NOTHING;
-SELECT setval('roles_id_seq', 4, true);
+SELECT setval('roles_id_seq', 6, true);
 
+-- Los usuarios 4-6 son PLACEHOLDERS (correo/nombre de prueba, no personas reales)
+-- — mismo patrón que "Juan Pérez" para Anulación de Matrícula. Reemplazar por
+-- los contactos reales de Soporte TI y de los dos encargados de certificados
+-- en cuanto se conozcan (ver ARQUITECTURA.md).
 INSERT INTO usuarios_panel (id, cedula, nombres, correo, password_hash, rol_id) OVERRIDING SYSTEM VALUE VALUES
   (1, '1710000001', 'Juan Pérez', 'juan.perez@yavirac.edu.ec', '$2b$10$0QtCdZxm3aIiCJaDJjQmbeF1PofnoarFzwmhE8JMR4gBEiCvEwvW.', 2),
   (2, '1710000002', 'María López', 'maria.lopez@yavirac.edu.ec', '$2b$10$0QtCdZxm3aIiCJaDJjQmbeF1PofnoarFzwmhE8JMR4gBEiCvEwvW.', 3),
-  (3, '1710000003', 'Carlos Ruiz', 'carlos.ruiz@yavirac.edu.ec', '$2b$10$0QtCdZxm3aIiCJaDJjQmbeF1PofnoarFzwmhE8JMR4gBEiCvEwvW.', 4)
+  (3, '1710000003', 'Carlos Ruiz', 'carlos.ruiz@yavirac.edu.ec', '$2b$10$0QtCdZxm3aIiCJaDJjQmbeF1PofnoarFzwmhE8JMR4gBEiCvEwvW.', 4),
+  (4, '1710000004', 'PENDIENTE ASIGNAR (Soporte TI)', 'soporte.ti@yavirac.edu.ec', '$2b$10$0QtCdZxm3aIiCJaDJjQmbeF1PofnoarFzwmhE8JMR4gBEiCvEwvW.', 6),
+  (5, '1710000005', 'PENDIENTE ASIGNAR (Certificados 1)', 'certificados1@yavirac.edu.ec', '$2b$10$0QtCdZxm3aIiCJaDJjQmbeF1PofnoarFzwmhE8JMR4gBEiCvEwvW.', 5),
+  (6, '1710000006', 'PENDIENTE ASIGNAR (Certificados 2)', 'certificados2@yavirac.edu.ec', '$2b$10$0QtCdZxm3aIiCJaDJjQmbeF1PofnoarFzwmhE8JMR4gBEiCvEwvW.', 5)
 ON CONFLICT (cedula) DO NOTHING;
-SELECT setval('usuarios_panel_id_seq', 3, true);
+SELECT setval('usuarios_panel_id_seq', 6, true);
 
 INSERT INTO asignaciones_responsables (tipo_solicitud_id, carrera_id, usuario_id, vigente, semestre) VALUES
   (2, 1, 1, true, '2026-1'),
@@ -286,7 +303,10 @@ INSERT INTO asignaciones_responsables (tipo_solicitud_id, carrera_id, usuario_id
   (4, 1, 1, true, '2026-1'),
   (4, 2, 1, true, '2026-1'),
   (3, NULL, 2, true, '2026-1'),
-  (5, NULL, 3, true, '2026-1');
+  (5, NULL, 3, true, '2026-1'),
+  (6, NULL, 4, true, '2026-1'),
+  (1, NULL, 5, true, '2026-1'),
+  (1, NULL, 6, true, '2026-1');
 
 -- Laboratorios reales (sin datos sensibles — nombres/códigos institucionales).
 INSERT INTO laboratorios (id, codigo, nombre, cantidad_equipos) OVERRIDING SYSTEM VALUE VALUES
@@ -302,18 +322,23 @@ SELECT setval('laboratorios_id_seq', 5, true);
 -- probar el flujo de "Reportar incidencia en laboratorio". Igual que en el
 -- sistema real, cada docente tiene también una cuenta en usuarios_panel con
 -- rol PROFESOR (así se resuelve alertas.profesor_id).
+-- El correo apunta a la bandeja real del alumno (abv.carrera@yavirac.edu.ec)
+-- para que el OTP de este docente de prueba sea revisable en demos en vivo.
 INSERT INTO docentes (cedula, nombre_docente, correo) VALUES
-  ('1710000009', 'PEREZ SANCHEZ PEDRO (PRUEBA)', 'pedro.sanchez@yavirac.edu.ec')
+  ('1710000009', 'PEREZ SANCHEZ PEDRO (PRUEBA)', 'abv.carrera@yavirac.edu.ec'),
+  ('1710000017', 'PRUEBA DOCENTE DOS', 'abv.carrera+docente2@yavirac.edu.ec')
 ON CONFLICT (cedula) DO NOTHING;
 
 INSERT INTO usuarios_panel (cedula, nombres, correo, password_hash, rol_id) VALUES
-  ('1710000009', 'PEREZ SANCHEZ PEDRO (PRUEBA)', 'pedro.sanchez@yavirac.edu.ec', '$2b$10$0QtCdZxm3aIiCJaDJjQmbeF1PofnoarFzwmhE8JMR4gBEiCvEwvW.', 1)
+  ('1710000009', 'PEREZ SANCHEZ PEDRO (PRUEBA)', 'abv.carrera@yavirac.edu.ec', '$2b$10$0QtCdZxm3aIiCJaDJjQmbeF1PofnoarFzwmhE8JMR4gBEiCvEwvW.', 1),
+  ('1710000017', 'PRUEBA DOCENTE DOS', 'abv.carrera+docente2@yavirac.edu.ec', '$2b$10$0QtCdZxm3aIiCJaDJjQmbeF1PofnoarFzwmhE8JMR4gBEiCvEwvW.', 1)
 ON CONFLICT (cedula) DO NOTHING;
 
 -- Cédulas con dígito verificador módulo 10 ecuatoriano válido.
 INSERT INTO estudiantes (id, cedula, nombres, carrera_id, nivel, paralelo, estado_matricula, correo, modalidad, periodo_ingreso_id) OVERRIDING SYSTEM VALUE VALUES
   (1, '1702030402', 'CARRERA ANDREW', 2, 'Octavo', 'A', 'MATRICULADO', 'abv.carrera@yavirac.edu.ec', 'DUAL', 2),
   (2, '1122334459', 'TORRES MISHELL', 2, 'Quinto', 'A', 'MATRICULADO', 'mishell.torres@yavirac.edu.ec', 'PRESENCIAL', 2),
-  (3, '0908070600', 'ANDRADE KEVIN', 2, 'Segundo', 'A', 'RETIRADO', 'kevin.andrade@yavirac.edu.ec', 'PRESENCIAL', 2)
+  (3, '0908070600', 'ANDRADE KEVIN', 2, 'Segundo', 'A', 'RETIRADO', 'kevin.andrade@yavirac.edu.ec', 'PRESENCIAL', 2),
+  (4, '1720000056', 'PRUEBA ESTUDIANTE DOS', 2, 'Sexto', 'B', 'MATRICULADO', 'abv.carrera+estudiante2@yavirac.edu.ec', 'PRESENCIAL', 2)
 ON CONFLICT (cedula) DO NOTHING;
-SELECT setval('estudiantes_id_seq', 3, true);
+SELECT setval('estudiantes_id_seq', 4, true);
