@@ -286,6 +286,14 @@
 
 <ion-footer>
   <ion-toolbar *ngIf="estado === 'esperando_cedula' || estado === 'consultando'">
+    <div class="tarjeta-recaptcha">
+      <div class="franja-superior"></div>
+      <div class="encabezado-recaptcha">
+        <ion-icon name="shield-checkmark-outline"></ion-icon>
+        <span>Verificación de seguridad</span>
+      </div>
+      <div id="recaptcha-cedula" class="recaptcha-contenedor"></div>
+    </div>
     <ion-item lines="none" class="input-cedula">
       <ion-input
         placeholder="Ingresa tu número de cédula"

@@ -3,8 +3,8 @@
   "nodes": [
     {
       "parameters": {
-        "content": "## Consultar estudiante o docente por cédula (esquema REAL)\n- Primero busca en `estudiantes`. Si no hay match, busca en `docentes` (segunda identidad, misma cédula/OTP).\n- La respuesta incluye `tipoUsuario: 'ESTUDIANTE' | 'DOCENTE'` — la app usa este campo para decidir qué menú mostrar (el flujo de cédula+OTP es idéntico para ambos, no hay pantalla de login separada).\n- estudiantes.correo (no correo_institucional). estudiantes.nombres trae el nombre completo; no hay columna apellidos separada, se devuelve '' para no romper el contrato.\n- carrera se obtiene por JOIN a carreras (carrera_id). periodoActual viene de periodos_academicos WHERE vigente = true.\n- Los docentes no tienen carrera/nivel/periodo/estadoMatricula — esos campos van null en su respuesta.\n- Query parametrizada ($1) — NUNCA concatenar el input del usuario en el SQL.\n- Incluye manejo de preflight CORS (OPTIONS) para que el navegador no bloquee el POST real.",
-        "height": 300,
+        "content": "## Consultar estudiante o docente por cédula (esquema REAL)\n- Primero busca en `estudiantes`. Si no hay match, busca en `docentes` (segunda identidad, misma cédula/OTP).\n- La respuesta incluye `tipoUsuario: 'ESTUDIANTE' | 'DOCENTE'` — la app usa este campo para decidir qué menú mostrar (el flujo de cédula+OTP es idéntico para ambos, no hay pantalla de login separada).\n- estudiantes.correo (no correo_institucional). estudiantes.nombres trae el nombre completo; no hay columna apellidos separada, se devuelve '' para no romper el contrato.\n- carrera se obtiene por JOIN a carreras (carrera_id). periodoActual viene de periodos_academicos WHERE vigente = true.\n- Los docentes no tienen carrera/nivel/periodo/estadoMatricula — esos campos van null en su respuesta.\n- Query parametrizada ($1) — NUNCA concatenar el input del usuario en el SQL.\n- Incluye manejo de preflight CORS (OPTIONS) para que el navegador no bloquee el POST real.\n- CAPTCHA (reCAPTCHA v2, agregado 2026-07-22): este es el único punto de\n  entrada sin OTP previo (aquí se consulta si la cédula existe), así que es\n  el más expuesto a fuerza bruta/enumeración — se verifica el token contra\n  la API de Google (siteverify) ANTES de tocar la BD. Si falla, 403 y no se\n  llega a consultar estudiantes/docentes. onError=continueRegularOutput en\n  el HTTP Request: si Google no responde, el output no trae `success`, el\n  IF de abajo lo evalúa como inválido — falla cerrado, no abierto.\n- Secret Key real de la clave \"YaviBot Chat\" (google.com/recaptcha/admin),\n  autorizada hoy para los dominios localhost y 192.168.1.11 — antes de\n  desplegar al VPS, agregar ahí el dominio real del instituto (misma clave,\n  no hace falta regenerarla). Su Site Key pareja vive en environment.ts.",
+        "height": 420,
         "width": 380
       },
       "id": "a1111111-1111-4111-8111-111111111111",
@@ -92,11 +92,99 @@
     },
     {
       "parameters": {
+        "method": "POST",
+        "url": "https://www.google.com/recaptcha/api/siteverify",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "secret",
+              "value": "6Ld3V2AtAAAAAO4iLeDFFxf8z_HGRsojXaDkh50j"
+            },
+            {
+              "name": "response",
+              "value": "={{ $json.body.captchaToken }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "acaptch1-1111-4111-8111-111111111111",
+      "name": "Verificar CAPTCHA (Google)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "onError": "continueRegularOutput",
+      "position": [
+        300,
+        -260
+      ],
+      "notes": "Secret Key real de la clave \"YaviBot Chat\" en google.com/recaptcha/admin (dominios autorizados: localhost, 192.168.1.11). Agregar el dominio real del instituto ahí antes de producción."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "cond1",
+              "leftValue": "={{ $json.success }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "acaptch2-2222-4222-8222-222222222222",
+      "name": "¿CAPTCHA válido?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        560,
+        -260
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"error\": \"Verificación de seguridad fallida. Vuelve a marcar la casilla de verificación e intenta de nuevo.\" } }}",
+        "options": {
+          "responseCode": 403,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "acaptch3-3333-4333-8333-333333333333",
+      "name": "Responder: CAPTCHA inválido",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        560,
+        -420
+      ]
+    },
+    {
+      "parameters": {
         "operation": "executeQuery",
         "resource": "database",
         "query": "SELECT e.cedula, e.nombres, e.correo AS \"correoInstitucional\", c.nombre AS carrera, e.nivel, e.estado_matricula AS \"estadoMatricula\", p.nombre AS \"periodoActual\" FROM estudiantes e JOIN carreras c ON c.id = e.carrera_id LEFT JOIN periodos_academicos p ON p.vigente = true WHERE e.cedula = $1",
         "options": {
-          "queryReplacement": "={{ [ $json.body.cedula ] }}"
+          "queryReplacement": "={{ [ $('Webhook').item.json.body.cedula ] }}"
         }
       },
       "id": "a3333333-3333-4333-8333-333333333333",
@@ -285,7 +373,7 @@
       "main": [
         [
           {
-            "node": "Buscar Estudiante (Postgres)",
+            "node": "Verificar CAPTCHA (Google)",
             "type": "main",
             "index": 0
           }
@@ -355,6 +443,35 @@
         [
           {
             "node": "Responder: No encontrado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verificar CAPTCHA (Google)": {
+      "main": [
+        [
+          {
+            "node": "¿CAPTCHA válido?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿CAPTCHA válido?": {
+      "main": [
+        [
+          {
+            "node": "Buscar Estudiante (Postgres)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder: CAPTCHA inválido",
             "type": "main",
             "index": 0
           }

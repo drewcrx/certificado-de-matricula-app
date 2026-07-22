@@ -395,6 +395,50 @@
   }
 }
 
+.tarjeta-recaptcha {
+  position: relative;
+  overflow: hidden;
+  margin: 10px 10px 0;
+  background: #ffffff;
+  border: 1px solid #e7e9f2;
+  border-radius: 14px;
+  box-shadow: 0 4px 18px rgba(39, 67, 134, 0.08);
+
+  .franja-superior {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, var(--ion-color-primary), var(--ion-color-secondary));
+  }
+}
+
+.encabezado-recaptcha {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 14px 0;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--ion-color-primary);
+
+  ion-icon {
+    font-size: 15px;
+    color: var(--ion-color-secondary);
+  }
+}
+
+.recaptcha-contenedor {
+  display: flex;
+  justify-content: center;
+  padding: 6px 10px 10px;
+  transform: scale(0.92);
+  transform-origin: center top;
+}
+
 .input-cedula {
   --border-radius: 20px;
   --background: #fff;

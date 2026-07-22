@@ -1,4 +1,4 @@
-import { Component, OnInit, ViewChild } from '@angular/core';
+import { Component, NgZone, OnInit, ViewChild } from '@angular/core';
 import { IonContent } from '@ionic/angular';
 import * as QRCode from 'qrcode';
 import { firstValueFrom } from 'rxjs';
@@ -6,6 +6,7 @@ import { Network } from '@capacitor/network';
 import { EstudianteService } from '../services/estudiante.service';
 import { CertificadoPdfService } from '../services/certificado-pdf.service';
 import { validarCedulaEcuatoriana } from '../utils/validar-cedula';
+import { environment } from '../../environments/environment';
 import {
   CertificadoMatricula,
   Estudiante,
@@ -15,6 +16,14 @@ import {
   TicketSolicitud,
   Usuario
 } from '../models/estudiante.model';
+
+// El script de Google (index.html) crea este global; no hay @types oficial
+// instalado en el proyecto, así que se declara mínimamente aquí.
+declare const grecaptcha: {
+  render(container: string | HTMLElement, params: Record<string, unknown>): number;
+  reset(widgetId?: number): void;
+  getResponse(widgetId?: number): string;
+};
 
 const LONGITUD_TICKET_VERIFICACION = 6;
 
@@ -102,6 +111,9 @@ export class ChatPage implements OnInit {
   ticketIngresado = '';
   errorTicket = '';
 
+  captchaToken: string | null = null;
+  private recaptchaWidgetId: number | null = null;
+
   descripcionIncidencia = '';
   errorFoto = '';
   fotoSeleccionada: { base64: string; mime: string; previewUrl: string } | null = null;
@@ -112,11 +124,48 @@ export class ChatPage implements OnInit {
 
   constructor(
     private estudianteService: EstudianteService,
-    private certificadoPdfService: CertificadoPdfService
+    private certificadoPdfService: CertificadoPdfService,
+    private ngZone: NgZone
   ) {}
 
   ngOnInit(): void {
     this.iniciarConversacion();
+    this.renderCaptcha();
+  }
+
+  /**
+   * Renderiza el widget de reCAPTCHA en el contenedor del footer. El script
+   * de Google (index.html) carga de forma asíncrona, así que reintenta
+   * hasta que `grecaptcha` esté disponible — el contenedor #recaptcha-cedula
+   * ya existe desde el primer render porque `estado` arranca en
+   * 'esperando_cedula'.
+   */
+  private renderCaptcha(intentos = 0): void {
+    const contenedor = document.getElementById('recaptcha-cedula');
+    if (typeof grecaptcha === 'undefined' || !grecaptcha.render || !contenedor) {
+      if (intentos < 40) {
+        setTimeout(() => this.renderCaptcha(intentos + 1), 250);
+      }
+      return;
+    }
+
+    this.recaptchaWidgetId = grecaptcha.render(contenedor, {
+      sitekey: environment.recaptchaSiteKey,
+      callback: (token: string) => this.ngZone.run(() => { this.captchaToken = token; }),
+      'expired-callback': () => this.ngZone.run(() => { this.captchaToken = null; }),
+      'error-callback': () => this.ngZone.run(() => { this.captchaToken = null; })
+    });
+  }
+
+  /**
+   * Los tokens de reCAPTCHA v2 son de un solo uso: hay que reiniciar el
+   * widget después de cada intento (exitoso o no) para pedir uno nuevo.
+   */
+  private resetCaptcha(): void {
+    this.captchaToken = null;
+    if (this.recaptchaWidgetId !== null && typeof grecaptcha !== 'undefined') {
+      grecaptcha.reset(this.recaptchaWidgetId);
+    }
   }
 
   get opcionesMenu(): OpcionChat[] {
@@ -140,19 +189,22 @@ export class ChatPage implements OnInit {
   }
 
   get puedeEnviarCedula(): boolean {
-    return validarCedulaEcuatoriana(this.cedulaIngresada) && this.estado === 'esperando_cedula';
+    return validarCedulaEcuatoriana(this.cedulaIngresada) && !!this.captchaToken && this.estado === 'esperando_cedula';
   }
 
   async enviarCedula(): Promise<void> {
     if (!this.puedeEnviarCedula) {
-      this.errorCedula = /^\d{10}$/.test(this.cedulaIngresada)
-        ? 'Ese número de cédula no es válido. Verifica que esté bien escrito.'
-        : 'Ingresa un número de cédula de 10 dígitos.';
+      this.errorCedula = !validarCedulaEcuatoriana(this.cedulaIngresada)
+        ? (/^\d{10}$/.test(this.cedulaIngresada)
+          ? 'Ese número de cédula no es válido. Verifica que esté bien escrito.'
+          : 'Ingresa un número de cédula de 10 dígitos.')
+        : 'Marca la casilla de verificación "No soy un robot" antes de continuar.';
       return;
     }
     this.errorCedula = '';
 
     const cedula = this.cedulaIngresada;
+    const captchaToken = this.captchaToken!;
     this.agregarMensaje({ tipo: 'usuario-texto', texto: cedula });
     this.cedulaIngresada = '';
     this.estado = 'consultando';
@@ -163,9 +215,10 @@ export class ChatPage implements OnInit {
     }
 
     this.mostrarEscribiendo();
-    this.estudianteService.consultarPorCedula(cedula).subscribe({
+    this.estudianteService.consultarPorCedula(cedula, captchaToken).subscribe({
       next: async usuario => {
         this.quitarEscribiendo();
+        this.resetCaptcha();
         if (!usuario) {
           await this.hablar('No encontré ningún estudiante ni docente con esa cédula. ¿Puedes verificar el número e intentarlo de nuevo?');
           this.estado = 'esperando_cedula';
@@ -177,6 +230,7 @@ export class ChatPage implements OnInit {
       },
       error: async () => {
         this.quitarEscribiendo();
+        this.resetCaptcha();
         await this.hablar('Tuve un problema consultando tus datos. Intenta nuevamente en unos segundos.');
         this.estado = 'esperando_cedula';
       }

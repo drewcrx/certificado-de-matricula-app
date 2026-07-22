@@ -106,16 +106,18 @@ export class EstudianteService {
    * del usuario consultados desde la base de datos del servidor. Primero
    * busca en estudiantes; si no hay match, busca en docentes — mismo flujo
    * de identificación para ambos roles, sin pantalla de login separada.
-   * Webhook real esperado: POST {n8nBaseUrl}/consultar-estudiante  body: { cedula }
+   * Webhook real esperado: POST {n8nBaseUrl}/consultar-estudiante
+   * body: { cedula, captchaToken } — n8n verifica captchaToken contra la API
+   * de Google (siteverify) antes de consultar la BD; responde 403 si falla.
    */
-  consultarPorCedula(cedula: string): Observable<Usuario | null> {
+  consultarPorCedula(cedula: string, captchaToken: string): Observable<Usuario | null> {
     if (environment.usarMock) {
       const encontrado = this.buscarUsuarioMock(cedula) ?? null;
       return of(encontrado).pipe(delay(900));
     }
 
     return this.http
-      .post<Usuario>(`${environment.n8nBaseUrl}/consultar-estudiante`, { cedula })
+      .post<Usuario>(`${environment.n8nBaseUrl}/consultar-estudiante`, { cedula, captchaToken })
       .pipe(map(usuario => usuario ?? null));
   }
 
