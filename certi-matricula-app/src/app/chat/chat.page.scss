@@ -141,18 +141,51 @@
 }
 
 .tarjeta-opciones {
+  position: relative;
+  overflow: hidden;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  padding-top: 17px;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 5px;
+    background: linear-gradient(90deg, var(--ion-color-primary), var(--ion-color-secondary));
+  }
 
   ion-chip {
-    --background: #e8ecf7;
-    --color: var(--ion-color-primary);
+    --background: #f5f7fb;
+    --color: #1f2430;
+    border: 1px solid #e7e9f2;
+    font-weight: 600;
+    font-size: 13px;
+    transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
     cursor: pointer;
+
+    ion-icon {
+      color: var(--ion-color-secondary);
+    }
+
+    &:hover,
+    &:active {
+      --background: linear-gradient(135deg, #f0f3fb, #fdeee5);
+      border-color: #dfe3f0;
+      transform: translateY(-1px);
+    }
   }
 
   ion-chip.deshabilitado {
-    opacity: 0.55;
+    opacity: 0.5;
+    pointer-events: none;
+
+    ion-icon {
+      color: #9aa1b4;
+    }
   }
 }
 
@@ -287,11 +320,20 @@
 }
 
 .tarjeta-tickets {
-  h3 {
-    margin: 0 0 10px;
-    font-size: 15px;
-    font-weight: 700;
-    color: var(--ion-color-primary);
+  position: relative;
+  overflow: hidden;
+  padding: 0 18px 16px;
+  border: 1px solid #e7e9f2;
+  background: #ffffff;
+  box-shadow: 0 4px 18px rgba(39, 67, 134, 0.08);
+
+  .franja-superior {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 5px;
+    background: linear-gradient(90deg, var(--ion-color-primary), var(--ion-color-secondary));
   }
 
   .fila-ticket {
@@ -394,32 +436,31 @@
 }
 
 
-// ── Tarjeta Anulación de Matrícula ──────────────────────────────────────────
+// ── Tarjetas de confirmación (Anulación, Reseteo, Incidencia) — mismo
+// lenguaje visual premium que la tarjeta del certificado ──────────────────
 .tarjeta-anulacion {
-  .encabezado-anulacion {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-weight: 700;
-    font-size: 13px;
-    color: var(--ion-color-danger);
-    margin-bottom: 12px;
+  position: relative;
+  overflow: hidden;
+  padding: 0 18px 16px;
+  border: 1px solid #e7e9f2;
+  background: #ffffff;
+  box-shadow: 0 4px 18px rgba(39, 67, 134, 0.08);
 
-    ion-icon { font-size: 20px; }
+  .franja-superior {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 5px;
+    background: linear-gradient(90deg, var(--ion-color-primary), var(--ion-color-secondary));
+
+    &.franja-alerta {
+      background: linear-gradient(90deg, var(--ion-color-danger), var(--ion-color-secondary));
+    }
   }
 
-  ul {
-    list-style: none;
-    padding: 0;
-    margin: 0 0 12px;
-
-    li {
-      font-size: 13px;
-      padding: 4px 0;
-      border-bottom: 1px solid #f0f0f0;
-
-      &:last-child { border-bottom: none; }
-    }
+  .insignia.insignia-alerta {
+    background: linear-gradient(135deg, var(--ion-color-danger), #ff6b6b);
   }
 
   .aviso-anulacion {
@@ -457,7 +498,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 10px;
   padding: 6px 10px;
 
   ion-button {
@@ -470,4 +511,50 @@
       cursor: pointer;
     }
   }
+}
+
+.boton-adjuntar-foto {
+  --background: linear-gradient(90deg, var(--ion-color-primary), var(--ion-color-secondary));
+  --background-activated: linear-gradient(90deg, var(--ion-color-primary-shade), var(--ion-color-secondary-shade));
+  --background-hover: linear-gradient(90deg, var(--ion-color-primary), var(--ion-color-secondary));
+  --color: #ffffff;
+  --border-radius: 12px;
+  --box-shadow: 0 4px 14px rgba(39, 67, 134, 0.28);
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+
+.boton-continuar-sin-foto {
+  --color: #9aa1b4;
+  font-weight: 600;
+  font-size: 13px;
+  text-transform: none;
+}
+
+// ── Botón "Volver al menú" ──────────────────────────────────────────────────
+.boton-volver-menu {
+  --color: var(--ion-color-primary);
+  --background: #eef1fa;
+  --background-activated: #e2e7f5;
+  --background-hover: #e2e7f5;
+  --border-radius: 12px;
+  --padding-start: 12px;
+  --padding-end: 14px;
+  font-weight: 600;
+  font-size: 13px;
+  margin: 6px 10px;
+  height: 34px;
+}
+
+// ── Botón "Iniciar nueva conversación" (fin de la conversación) ────────────
+.boton-nueva-conversacion {
+  --background: linear-gradient(90deg, var(--ion-color-primary), var(--ion-color-secondary));
+  --background-activated: linear-gradient(90deg, var(--ion-color-primary-shade), var(--ion-color-secondary-shade));
+  --background-hover: linear-gradient(90deg, var(--ion-color-primary), var(--ion-color-secondary));
+  --color: #ffffff;
+  --border-radius: 14px;
+  --box-shadow: 0 4px 14px rgba(39, 67, 134, 0.28);
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  margin: 6px 10px;
 }

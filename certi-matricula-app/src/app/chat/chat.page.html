@@ -121,17 +121,20 @@
           <img src="assets/icon/yavibot-avatar.png" alt="YaviBot" />
         </div>
         <div class="tarjeta tarjeta-anulacion">
-          <div class="encabezado-anulacion">
-            <ion-icon name="close-circle-outline"></ion-icon>
-            <span>SOLICITUD DE ANULACIÓN DE MATRÍCULA</span>
+          <div class="franja-superior franja-alerta"></div>
+          <div class="encabezado-certificado">
+            <div class="insignia insignia-alerta">
+              <ion-icon name="close-circle-outline"></ion-icon>
+            </div>
+            <span class="titulo-certificado">Solicitud de Anulación de Matrícula</span>
           </div>
-          <ul>
-            <li><strong>Estudiante:</strong> {{ m.estudiante?.nombres }} {{ m.estudiante?.apellidos }}</li>
-            <li><strong>Cédula:</strong> {{ m.estudiante?.cedula }}</li>
-            <li><strong>Carrera:</strong> {{ m.estudiante?.carrera }}</li>
-            <li><strong>Nivel:</strong> {{ m.estudiante?.nivel }}</li>
-            <li><strong>Periodo a anular:</strong> {{ m.estudiante?.periodoActual }}</li>
-          </ul>
+          <p class="nombre-certificado">{{ m.estudiante?.nombres }} {{ m.estudiante?.apellidos }}</p>
+          <div class="grid-detalle">
+            <div class="campo"><span class="etiqueta">Cédula</span><span class="valor">{{ m.estudiante?.cedula }}</span></div>
+            <div class="campo"><span class="etiqueta">Nivel</span><span class="valor">{{ m.estudiante?.nivel }}</span></div>
+            <div class="campo campo-ancho"><span class="etiqueta">Carrera</span><span class="valor">{{ m.estudiante?.carrera }}</span></div>
+            <div class="campo campo-ancho"><span class="etiqueta">Periodo a anular</span><span class="valor">{{ m.estudiante?.periodoActual }}</span></div>
+          </div>
           <p class="aviso-anulacion">
             <ion-icon name="warning-outline"></ion-icon>
             Esta solicitud será procesada por Secretaría en 3 a 5 días hábiles. Recibirás una confirmación por correo institucional.
@@ -154,15 +157,18 @@
           <img src="assets/icon/yavibot-avatar.png" alt="YaviBot" />
         </div>
         <div class="tarjeta tarjeta-anulacion">
-          <div class="encabezado-anulacion">
-            <ion-icon name="key-outline"></ion-icon>
-            <span>RESETEO DE CONTRASEÑA DE CORREO INSTITUCIONAL</span>
+          <div class="franja-superior"></div>
+          <div class="encabezado-certificado">
+            <div class="insignia">
+              <ion-icon name="key-outline"></ion-icon>
+            </div>
+            <span class="titulo-certificado">Reseteo de Contraseña de Correo Institucional</span>
           </div>
-          <ul>
-            <li><strong>Estudiante:</strong> {{ m.estudiante?.nombres }} {{ m.estudiante?.apellidos }}</li>
-            <li><strong>Cédula:</strong> {{ m.estudiante?.cedula }}</li>
-            <li><strong>Correo institucional:</strong> {{ m.estudiante?.correoInstitucional }}</li>
-          </ul>
+          <p class="nombre-certificado">{{ m.estudiante?.nombres }} {{ m.estudiante?.apellidos }}</p>
+          <div class="grid-detalle">
+            <div class="campo"><span class="etiqueta">Cédula</span><span class="valor">{{ m.estudiante?.cedula }}</span></div>
+            <div class="campo campo-ancho"><span class="etiqueta">Correo institucional</span><span class="valor">{{ m.estudiante?.correoInstitucional }}</span></div>
+          </div>
           <p class="aviso-anulacion">
             <ion-icon name="information-circle-outline"></ion-icon>
             El reseteo es inmediato. Recibirás tu nueva contraseña temporal en tu correo institucional apenas confirmes.
@@ -197,14 +203,17 @@
           <img src="assets/icon/yavibot-avatar.png" alt="YaviBot" />
         </div>
         <div class="tarjeta tarjeta-anulacion">
-          <div class="encabezado-anulacion">
-            <ion-icon name="alert-circle-outline"></ion-icon>
-            <span>REPORTE DE INCIDENCIA DE LABORATORIO</span>
+          <div class="franja-superior"></div>
+          <div class="encabezado-certificado">
+            <div class="insignia">
+              <ion-icon name="alert-circle-outline"></ion-icon>
+            </div>
+            <span class="titulo-certificado">Reporte de Incidencia de Laboratorio</span>
           </div>
-          <ul>
-            <li><strong>Laboratorio:</strong> {{ m.laboratorioSeleccionado?.nombre }}</li>
-            <li><strong>Descripción:</strong> {{ m.descripcionIncidencia }}</li>
-          </ul>
+          <p class="nombre-certificado">{{ m.laboratorioSeleccionado?.nombre }}</p>
+          <div class="grid-detalle">
+            <div class="campo campo-ancho"><span class="etiqueta">Descripción</span><span class="valor">{{ m.descripcionIncidencia }}</span></div>
+          </div>
           <img *ngIf="m.fotoPreviewUrl" [src]="m.fotoPreviewUrl" alt="Foto de la incidencia" class="foto-incidencia-preview" />
           <div class="botones-anulacion">
             <ion-button expand="block" color="secondary" (click)="confirmarReporteIncidencia()" [disabled]="estado === 'reportando_incidencia'">
@@ -224,7 +233,13 @@
           <img src="assets/icon/yavibot-avatar.png" alt="YaviBot" />
         </div>
         <div class="tarjeta tarjeta-tickets">
-          <h3>Reporte de incidencia</h3>
+          <div class="franja-superior"></div>
+          <div class="encabezado-certificado">
+            <div class="insignia">
+              <ion-icon name="document-text-outline"></ion-icon>
+            </div>
+            <span class="titulo-certificado">Reporte de Incidencia</span>
+          </div>
           <div class="fila-ticket">
             <div class="fila-ticket-encabezado">
               <span class="ticket-id">{{ m.incidencia?.codigo }}</span>
@@ -241,7 +256,13 @@
           <img src="assets/icon/yavibot-avatar.png" alt="YaviBot" />
         </div>
         <div class="tarjeta tarjeta-tickets">
-          <h3>Seguimiento de tickets</h3>
+          <div class="franja-superior"></div>
+          <div class="encabezado-certificado">
+            <div class="insignia">
+              <ion-icon name="list-outline"></ion-icon>
+            </div>
+            <span class="titulo-certificado">Seguimiento de Tickets</span>
+          </div>
           <div class="fila-ticket" *ngFor="let t of m.tickets">
             <div class="fila-ticket-encabezado">
               <span class="ticket-id">{{ t.id }}</span>
@@ -299,7 +320,7 @@
   </ion-toolbar>
 
   <ion-toolbar *ngIf="estado === 'menu' || estado === 'preview_certificado' || estado === 'seleccionando_laboratorio'">
-    <ion-button fill="clear" size="small" (click)="volverAlMenu()" *ngIf="estado === 'preview_certificado' || estado === 'seleccionando_laboratorio'">
+    <ion-button size="small" class="boton-volver-menu" (click)="volverAlMenu()" *ngIf="estado === 'preview_certificado' || estado === 'seleccionando_laboratorio'">
       <ion-icon slot="start" name="arrow-back-outline"></ion-icon>
       Volver al menú
     </ion-button>
@@ -321,7 +342,7 @@
 
   <ion-toolbar *ngIf="estado === 'adjuntando_foto'">
     <div class="adjuntar-foto">
-      <ion-button fill="outline" size="small">
+      <ion-button size="small" class="boton-adjuntar-foto">
         <ion-icon slot="start" name="camera-outline"></ion-icon>
         Adjuntar foto
         <input
@@ -330,7 +351,7 @@
           capture="environment"
           (change)="onFotoSeleccionada($event)" />
       </ion-button>
-      <ion-button fill="clear" size="small" color="medium" (click)="continuarSinFoto()">
+      <ion-button fill="clear" size="small" class="boton-continuar-sin-foto" (click)="continuarSinFoto()">
         Continuar sin foto
       </ion-button>
     </div>
@@ -338,7 +359,7 @@
   </ion-toolbar>
 
   <ion-toolbar *ngIf="estado === 'finalizado'">
-    <ion-button expand="block" fill="outline" (click)="nuevaConsulta()">
+    <ion-button expand="block" class="boton-nueva-conversacion" (click)="nuevaConsulta()">
       <ion-icon slot="start" name="refresh-outline"></ion-icon>
       Iniciar nueva conversación
     </ion-button>
