@@ -436,7 +436,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const alerta = $('Generar Código (Postgres)').item.json;\nconst fecha = new Date(alerta.creado_en);\nconst fechaReporte = fecha.toLocaleDateString('es-EC', {\n  year: 'numeric', month: 'long', day: '2-digit'\n});\n\nreturn [{\n  json: {\n    codigo: alerta.codigo,\n    laboratorio: $('Webhook').item.json.body.laboratorioCodigo,\n    descripcion: $('Webhook').item.json.body.descripcion,\n    estado: 'Pendiente',\n    fechaReporte,\n    tieneFoto: !!$('Webhook').item.json.body.fotoBase64,\n    correoResponsable: $('Buscar Responsable (Postgres)').item.json.correoResponsable ?? null,\n    nombreResponsable: $('Buscar Responsable (Postgres)').item.json.nombreResponsable ?? null,\n    nombreDocente: $('Buscar Docente Válido (Postgres)').item.json.nombreDocente\n  }\n}];"
+        "jsCode": "const alerta = $('Generar Código (Postgres)').item.json;\nconst fecha = new Date(alerta.creado_en);\nconst fechaReporte = fecha.toLocaleDateString('es-EC', {\n  year: 'numeric', month: 'long', day: '2-digit', timeZone: 'America/Guayaquil'\n});\n\nreturn [{\n  json: {\n    codigo: alerta.codigo,\n    laboratorio: $('Webhook').item.json.body.laboratorioCodigo,\n    descripcion: $('Webhook').item.json.body.descripcion,\n    estado: 'Pendiente',\n    fechaReporte,\n    tieneFoto: !!$('Webhook').item.json.body.fotoBase64,\n    correoResponsable: $('Buscar Responsable (Postgres)').item.json.correoResponsable ?? null,\n    nombreResponsable: $('Buscar Responsable (Postgres)').item.json.nombreResponsable ?? null,\n    nombreDocente: $('Buscar Docente Válido (Postgres)').item.json.nombreDocente\n  }\n}];"
       },
       "id": "idddddd1-dddd-4ddd-8ddd-ddddddddddd1",
       "name": "Formatear Respuesta",
@@ -481,11 +481,89 @@
     },
     {
       "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "cond1",
+              "leftValue": "={{ $('Webhook').item.json.body.fotoBase64 }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "ihhhhhh8-hhhh-4hhh-8hhh-hhhhhhhhhhh8",
+      "name": "¿Adjuntar foto al correo?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        4620,
+        60
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "fileSelector": "={{ \"/data/storage/uploads/\" + $('Preparar Foto (Binario)').item.json.nombreArchivo }}",
+        "options": {
+          "dataPropertyName": "foto"
+        }
+      },
+      "id": "ihhhhhh9-hhhh-4hhh-8hhh-hhhhhhhhhhh9",
+      "name": "Leer Foto en Disco",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "onError": "continueRegularOutput",
+      "position": [
+        4880,
+        -60
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "no-reply@yavirac.edu.ec",
+        "toEmail": "={{ $('Formatear Respuesta').item.json.correoResponsable }}",
+        "subject": "=Nueva incidencia de laboratorio — {{ $('Formatear Respuesta').item.json.codigo }}",
+        "emailFormat": "text",
+        "text": "=🔬 INSTITUTO SUPERIOR TECNOLÓGICO DE TURISMO Y PATRIMONIO \"YAVIRAC\"\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n⚠️ Nueva incidencia de laboratorio\n\nEstimado/a {{ $('Formatear Respuesta').item.json.nombreResponsable }},\n\nEl/la docente {{ $('Formatear Respuesta').item.json.nombreDocente }} reportó una nueva incidencia:\n\nCódigo: {{ $('Formatear Respuesta').item.json.codigo }}\nLaboratorio: {{ $('Formatear Respuesta').item.json.laboratorio }}\nDescripción: {{ $('Formatear Respuesta').item.json.descripcion }}\nFecha: {{ $('Formatear Respuesta').item.json.fechaReporte }}\n\n📷 Se adjunta una foto de la incidencia.\n\nIngresa al panel administrativo para gestionar esta incidencia.\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n📱 Enviado desde la app móvil · YaviBot\nInstituto Superior Tecnológico de Turismo y Patrimonio \"YAVIRAC\" · Quito, Ecuador\nwww.yavirac.edu.ec",
+        "options": {
+          "fileAttachments": "foto"
+        }
+      },
+      "id": "ihhhhhh10-hhhh-4hhh-8hhh-hhhhhhhhhh10",
+      "name": "Enviar Aviso a Responsable (Correo con foto)",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "onError": "continueRegularOutput",
+      "position": [
+        5140,
+        -60
+      ],
+      "notes": "CONFIGURAR: credenciales SMTP. onError=continueRegularOutput: no debe afectar el reporte ya guardado si el correo falla.",
+      "credentials": {
+        "smtp": {
+          "id": "REEMPLAZAR",
+          "name": "REEMPLAZAR con credencial SMTP (Mailtrap en pruebas)"
+        }
+      }
+    },
+    {
+      "parameters": {
         "fromEmail": "no-reply@yavirac.edu.ec",
         "toEmail": "={{ $json.correoResponsable }}",
         "subject": "=Nueva incidencia de laboratorio — {{ $json.codigo }}",
-        "emailFormat": "html",
-        "message": "=<div style=\"font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;\">\n  <div style=\"text-align: center; margin-bottom: 24px;\">\n    <h2 style=\"color: #1a237e; margin-top: 12px;\">Instituto Superior Tecnológico<br>de Turismo y Patrimonio \"YAVIRAC\"</h2>\n  </div>\n\n  <p>Estimado/a {{ $json.nombreResponsable }},</p>\n\n  <p>El/la docente <strong>{{ $json.nombreDocente }}</strong> reportó una nueva incidencia de laboratorio:</p>\n\n  <div style=\"background: #f5f5f5; border-left: 4px solid #1a237e; padding: 16px; margin: 20px 0; border-radius: 4px;\">\n    <p style=\"margin: 4px 0;\"><strong>Código:</strong> <code>{{ $json.codigo }}</code></p>\n    <p style=\"margin: 4px 0;\"><strong>Laboratorio:</strong> {{ $json.laboratorio }}</p>\n    <p style=\"margin: 4px 0;\"><strong>Descripción:</strong> {{ $json.descripcion }}</p>\n    <p style=\"margin: 4px 0;\"><strong>Fecha:</strong> {{ $json.fechaReporte }}</p>\n  </div>\n\n  <p>Ingresa al panel administrativo para gestionar esta incidencia.</p>\n\n  <hr style=\"border: none; border-top: 1px solid #ddd; margin: 24px 0;\" />\n\n  <p style=\"color: #666; font-size: 12px; text-align: center;\">\n    Este correo fue generado automáticamente por el sistema YaviBot.<br>\n    Instituto Superior Tecnológico de Turismo y Patrimonio \"YAVIRAC\" | www.yavirac.edu.ec\n  </p>\n</div>",
+        "emailFormat": "text",
+        "text": "=🔬 INSTITUTO SUPERIOR TECNOLÓGICO DE TURISMO Y PATRIMONIO \"YAVIRAC\"\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n⚠️ Nueva incidencia de laboratorio\n\nEstimado/a {{ $json.nombreResponsable }},\n\nEl/la docente {{ $json.nombreDocente }} reportó una nueva incidencia:\n\nCódigo: {{ $json.codigo }}\nLaboratorio: {{ $json.laboratorio }}\nDescripción: {{ $json.descripcion }}\nFecha: {{ $json.fechaReporte }}\n\nIngresa al panel administrativo para gestionar esta incidencia.\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n📱 Enviado desde la app móvil · YaviBot\nInstituto Superior Tecnológico de Turismo y Patrimonio \"YAVIRAC\" · Quito, Ecuador\nwww.yavirac.edu.ec",
         "options": {}
       },
       "id": "idddddd3-dddd-4ddd-8ddd-ddddddddddd3",
@@ -494,8 +572,8 @@
       "typeVersion": 2,
       "onError": "continueRegularOutput",
       "position": [
-        4620,
-        60
+        4880,
+        200
       ],
       "notes": "CONFIGURAR: credenciales SMTP. onError=continueRegularOutput: no debe afectar el reporte ya guardado si el correo falla.",
       "credentials": {
@@ -810,12 +888,41 @@
       "main": [
         [
           {
-            "node": "Enviar Aviso a Responsable (Correo)",
+            "node": "¿Adjuntar foto al correo?",
             "type": "main",
             "index": 0
           }
         ],
         []
+      ]
+    },
+    "¿Adjuntar foto al correo?": {
+      "main": [
+        [
+          {
+            "node": "Leer Foto en Disco",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Enviar Aviso a Responsable (Correo)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leer Foto en Disco": {
+      "main": [
+        [
+          {
+            "node": "Enviar Aviso a Responsable (Correo con foto)",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     }
   },

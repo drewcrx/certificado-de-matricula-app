@@ -263,7 +263,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const MAPA_ESTADO = {\n  'Pendiente': 'EN_PROCESO',\n  'En Proceso': 'EN_PROCESO',\n  'Resuelto': 'COMPLETADO'\n};\n\nconst ticket = $json;\nconst fecha = new Date(ticket.creado_en);\nconst fechaSolicitud = fecha.toLocaleDateString('es-EC', {\n  year: 'numeric', month: 'long', day: '2-digit'\n});\n\nreturn [{\n  json: {\n    id: ticket.codigo,\n    tipo: $('Buscar Tipo de Trámite (Postgres)').item.json.nombre,\n    estado: MAPA_ESTADO[ticket.estado] || 'EN_PROCESO',\n    fechaSolicitud\n  }\n}];"
+        "jsCode": "const MAPA_ESTADO = {\n  'Pendiente': 'EN_PROCESO',\n  'En Proceso': 'EN_PROCESO',\n  'Resuelto': 'COMPLETADO'\n};\n\nconst ticket = $json;\nconst fecha = new Date(ticket.creado_en);\nconst fechaSolicitud = fecha.toLocaleDateString('es-EC', {\n  year: 'numeric', month: 'long', day: '2-digit', timeZone: 'America/Guayaquil'\n});\n\nreturn [{\n  json: {\n    id: ticket.codigo,\n    tipo: $('Buscar Tipo de Trámite (Postgres)').item.json.nombre,\n    estado: MAPA_ESTADO[ticket.estado] || 'EN_PROCESO',\n    fechaSolicitud\n  }\n}];"
       },
       "id": "fdddddd3-dddd-4ddd-8ddd-ddddddddddd3",
       "name": "Formatear Respuesta Existente",
@@ -422,8 +422,8 @@
         "fromEmail": "tramites@yavirac.edu.ec",
         "toEmail": "={{ $json.correoResponsable }}",
         "subject": "=[{{ $('Generar Código (Postgres)').item.json.codigo }}] {{ $('Buscar Tipo de Trámite (Postgres)').item.json.nombre }}",
-        "emailFormat": "html",
-        "message": "=<div style=\"font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;\">\n  <div style=\"text-align: center; margin-bottom: 24px;\">\n    <h2 style=\"color: #1a237e; margin-top: 12px;\">Instituto Superior Tecnológico<br>de Turismo y Patrimonio \"YAVIRAC\"</h2>\n  </div>\n\n  <p>Estimado/a {{ $json.nombreResponsable }},</p>\n\n  <p>Se ha registrado una nueva solicitud de <strong>{{ $('Buscar Tipo de Trámite (Postgres)').item.json.nombre }}</strong> que requiere tu atención:</p>\n\n  <div style=\"background: #f5f5f5; border-left: 4px solid #1a237e; padding: 16px; margin: 20px 0; border-radius: 4px;\">\n    <p style=\"margin: 4px 0;\"><strong>Ticket:</strong> <code>{{ $('Generar Código (Postgres)').item.json.codigo }}</code></p>\n    <p style=\"margin: 4px 0;\"><strong>Estudiante:</strong> {{ $('Buscar Estudiante (Postgres)').item.json.nombres }} (cédula {{ $('Buscar Estudiante (Postgres)').item.json.cedula }})</p>\n    <p style=\"margin: 4px 0;\"><strong>Carrera:</strong> {{ $('Buscar Estudiante (Postgres)').item.json.carrera }}, {{ $('Buscar Estudiante (Postgres)').item.json.nivel }} — Paralelo {{ $('Buscar Estudiante (Postgres)').item.json.paralelo }}</p>\n  </div>\n\n  <p><strong>Cuando termines de procesar esta solicitud, simplemente responde este mismo correo</strong> (puedes adjuntar el PDF o la documentación correspondiente) — el sistema detecta tu respuesta automáticamente y marca el trámite como completado, sin que tengas que entrar a ningún otro sistema.</p>\n\n  <hr style=\"border: none; border-top: 1px solid #ddd; margin: 24px 0;\" />\n\n  <p style=\"color: #666; font-size: 12px; text-align: center;\">\n    Este correo fue generado automáticamente por el sistema YaviBot.<br>\n    Instituto Superior Tecnológico de Turismo y Patrimonio \"YAVIRAC\" | www.yavirac.edu.ec\n  </p>\n</div>",
+        "emailFormat": "text",
+        "text": "=🏫 INSTITUTO SUPERIOR TECNOLÓGICO DE TURISMO Y PATRIMONIO \"YAVIRAC\"\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n📋 Nueva solicitud de {{ $('Buscar Tipo de Trámite (Postgres)').item.json.nombre }}\n\nEstimado/a {{ $json.nombreResponsable }},\n\nSe ha registrado una nueva solicitud que requiere tu atención:\n\nTicket: {{ $('Generar Código (Postgres)').item.json.codigo }}\nEstudiante: {{ $('Buscar Estudiante (Postgres)').item.json.nombres }} (cédula {{ $('Buscar Estudiante (Postgres)').item.json.cedula }})\nCarrera: {{ $('Buscar Estudiante (Postgres)').item.json.carrera }}, {{ $('Buscar Estudiante (Postgres)').item.json.nivel }} — Paralelo {{ $('Buscar Estudiante (Postgres)').item.json.paralelo }}\n\nCuando termines de procesar esta solicitud, simplemente responde este mismo correo (puedes adjuntar el PDF o la documentación correspondiente) — el sistema detecta tu respuesta automáticamente y marca el trámite como completado, sin que tengas que entrar a ningún otro sistema.\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n📱 Enviado desde la app móvil · YaviBot\nInstituto Superior Tecnológico de Turismo y Patrimonio \"YAVIRAC\" · Quito, Ecuador\nwww.yavirac.edu.ec",
         "options": {}
       },
       "id": "fbbbbbb3-bbbb-4bbb-8bbb-bbbbbbbbbbb3",
@@ -493,7 +493,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const ticket = $('Preparar Eventos').item.json;\nconst fecha = new Date(ticket.creado_en);\nconst fechaSolicitud = fecha.toLocaleDateString('es-EC', {\n  year: 'numeric', month: 'long', day: '2-digit'\n});\n\nreturn [{\n  json: {\n    id: ticket.codigo,\n    tipo: $('Buscar Tipo de Trámite (Postgres)').item.json.nombre,\n    estado: 'EN_PROCESO',\n    fechaSolicitud\n  }\n}];"
+        "jsCode": "const ticket = $('Preparar Eventos').item.json;\nconst fecha = new Date(ticket.creado_en);\nconst fechaSolicitud = fecha.toLocaleDateString('es-EC', {\n  year: 'numeric', month: 'long', day: '2-digit', timeZone: 'America/Guayaquil'\n});\n\nreturn [{\n  json: {\n    id: ticket.codigo,\n    tipo: $('Buscar Tipo de Trámite (Postgres)').item.json.nombre,\n    estado: 'EN_PROCESO',\n    fechaSolicitud\n  }\n}];"
       },
       "id": "faaaaaa4-aaaa-4aaa-8aaa-aaaaaaaaaaa4",
       "name": "Formatear Respuesta",

@@ -10,6 +10,8 @@ services:
       POSTGRES_USER: yavirac
       POSTGRES_PASSWORD: yavirac2026
       POSTGRES_DB: yavirac
+      TZ: America/Guayaquil
+      PGTZ: America/Guayaquil
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql   # crea tablas + datos de prueba al primer arranque
@@ -37,6 +39,10 @@ services:
       DB_POSTGRESDB_USER: yavirac
       DB_POSTGRESDB_PASSWORD: yavirac2026
       DB_POSTGRESDB_SCHEMA: n8n        # esquema separado para que n8n no pise las tablas de la app
+      # Zona horaria de Ecuador — evita que fechas/horas (tickets, certificados,
+      # cron, auditoría) se calculen en UTC y queden un día adelantadas/atrasadas.
+      GENERIC_TIMEZONE: America/Guayaquil
+      TZ: America/Guayaquil
       # URL pública de n8n (necesaria para que los webhooks tengan URL correcta)
       WEBHOOK_URL: http://localhost:5678/
       N8N_HOST: localhost

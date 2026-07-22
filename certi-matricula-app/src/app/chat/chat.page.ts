@@ -55,7 +55,6 @@ type EstadoConversacion =
   | 'menu'
   | 'preview_certificado'
   | 'generando_certificado'
-  | 'resultado'
   | 'consultando_tickets'
   | 'confirmando_anulacion'
   | 'procesando_anulacion'
@@ -355,8 +354,9 @@ export class ChatPage implements OnInit {
       },
       error: async () => {
         this.quitarEscribiendo();
-        await this.hablar('No pude registrar tu solicitud en este momento. Intenta nuevamente en unos segundos.');
-        this.estado = 'confirmando_anulacion';
+        await this.hablar('No pude registrar tu solicitud en este momento. Intenta nuevamente en unos segundos, o elige otra opción.');
+        this.agregarMensaje({ tipo: 'bot-opciones' });
+        this.estado = 'menu';
       }
     });
   }
@@ -405,8 +405,9 @@ export class ChatPage implements OnInit {
       },
       error: async () => {
         this.quitarEscribiendo();
-        await this.hablar('No pude completar el reseteo en este momento. Intenta nuevamente en unos segundos.');
-        this.estado = 'confirmando_reseteo_correo';
+        await this.hablar('No pude completar el reseteo en este momento. Intenta nuevamente en unos segundos, o elige otra opción.');
+        this.agregarMensaje({ tipo: 'bot-opciones' });
+        this.estado = 'menu';
       }
     });
   }
@@ -498,12 +499,14 @@ export class ChatPage implements OnInit {
         }
 
         await this.hablar('Este QR es único e irrepetible: podrá verificarse en el sistema web con este mismo código. ¿Deseas algo más?');
-        this.estado = 'resultado';
+        this.agregarMensaje({ tipo: 'bot-opciones' });
+        this.estado = 'menu';
       },
       error: async () => {
         this.quitarEscribiendo();
-        await this.hablar('No pude generar el certificado en este momento. Intenta nuevamente en unos segundos.');
-        this.estado = 'preview_certificado';
+        await this.hablar('No pude generar el certificado en este momento. Intenta nuevamente en unos segundos, o elige otra opción.');
+        this.agregarMensaje({ tipo: 'bot-opciones' });
+        this.estado = 'menu';
       }
     });
   }
@@ -661,8 +664,9 @@ export class ChatPage implements OnInit {
         },
         error: async () => {
           this.quitarEscribiendo();
-          await this.hablar('No pude registrar tu reporte en este momento. Intenta nuevamente en unos segundos.');
-          this.estado = 'confirmando_incidencia';
+          await this.hablar('No pude registrar tu reporte en este momento. Intenta nuevamente en unos segundos, o elige otra opción.');
+          this.agregarMensaje({ tipo: 'bot-opciones' });
+          this.estado = 'menu';
         }
       });
   }

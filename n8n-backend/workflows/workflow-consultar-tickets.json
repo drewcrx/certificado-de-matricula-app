@@ -117,7 +117,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const MAPA_ESTADO = {\n  'Pendiente': 'EN_PROCESO',\n  'En Proceso': 'EN_PROCESO',\n  'Resuelto': 'COMPLETADO'\n};\n\nconst tickets = $input.all()\n  .filter(item => item.json && item.json.id)\n  .map(item => {\n    const fecha = new Date(item.json.fecha_solicitud);\n    const fechaSolicitud = fecha.toLocaleDateString('es-EC', {\n      year: 'numeric', month: 'long', day: '2-digit'\n    });\n    return {\n      id: item.json.id,\n      tipo: item.json.tipo,\n      estado: MAPA_ESTADO[item.json.estado] || 'EN_PROCESO',\n      fechaSolicitud\n    };\n  });\n\nreturn [{ json: { tickets } }];"
+        "jsCode": "const MAPA_ESTADO = {\n  'Pendiente': 'EN_PROCESO',\n  'En Proceso': 'EN_PROCESO',\n  'Resuelto': 'COMPLETADO'\n};\n\nconst tickets = $input.all()\n  .filter(item => item.json && item.json.id)\n  .map(item => {\n    const fecha = new Date(item.json.fecha_solicitud);\n    const fechaSolicitud = fecha.toLocaleDateString('es-EC', {\n      year: 'numeric', month: 'long', day: '2-digit', timeZone: 'America/Guayaquil'\n    });\n    return {\n      id: item.json.id,\n      tipo: item.json.tipo,\n      estado: MAPA_ESTADO[item.json.estado] || 'EN_PROCESO',\n      fechaSolicitud\n    };\n  });\n\nreturn [{ json: { tickets } }];"
       },
       "id": "e4444444-4444-4444-8444-444444444444",
       "name": "Formatear Tickets",

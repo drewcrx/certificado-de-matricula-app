@@ -326,13 +326,6 @@
     <p class="error-cedula" *ngIf="errorFoto">{{ errorFoto }}</p>
   </ion-toolbar>
 
-  <ion-toolbar *ngIf="estado === 'resultado'">
-    <ion-button expand="block" fill="outline" (click)="nuevaConsulta()">
-      <ion-icon slot="start" name="refresh-outline"></ion-icon>
-      Nueva consulta
-    </ion-button>
-  </ion-toolbar>
-
   <ion-toolbar *ngIf="estado === 'finalizado'">
     <ion-button expand="block" fill="outline" (click)="nuevaConsulta()">
       <ion-icon slot="start" name="refresh-outline"></ion-icon>
