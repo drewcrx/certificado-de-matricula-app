@@ -6,11 +6,13 @@
 
 <ion-content class="ion-padding verificar-content">
   <div class="tarjeta-estado" *ngIf="cargando">
+    <img src="assets/icon/logo-yavirac.png" class="logo-institucion" alt="Instituto Superior Tecnológico YAVIRAC">
     <ion-spinner name="crescent"></ion-spinner>
     <p>Verificando certificado…</p>
   </div>
 
   <div class="tarjeta-estado tarjeta-ok" *ngIf="!cargando && resultado?.autentico">
+    <img src="assets/icon/logo-yavirac.png" class="logo-institucion" alt="Instituto Superior Tecnológico YAVIRAC">
     <ion-icon name="checkmark-circle" class="icono-estado"></ion-icon>
     <h2>Certificado Auténtico</h2>
     <p class="subtitulo">Este documento fue emitido oficialmente por el Instituto Superior Tecnológico de Turismo y Patrimonio "YAVIRAC".</p>
@@ -30,6 +32,7 @@
   </div>
 
   <div class="tarjeta-estado tarjeta-error" *ngIf="!cargando && !resultado?.autentico">
+    <img src="assets/icon/logo-yavirac.png" class="logo-institucion" alt="Instituto Superior Tecnológico YAVIRAC">
     <ion-icon name="close-circle" class="icono-estado"></ion-icon>
     <h2>Certificado No Válido</h2>
     <p class="subtitulo">{{ resultado?.error || 'No se pudo verificar este certificado.' }}</p>

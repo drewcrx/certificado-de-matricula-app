@@ -125,8 +125,13 @@
   30% { transform: translateY(-4px); opacity: 1; }
 }
 
+// Color de texto fijo (no ligado a variables de tema): estas tarjetas son
+// deliberadamente claras (fondo blanco), así que el texto debe quedar oscuro
+// SIEMPRE — si no, en modo oscuro del sistema el texto hereda blanco de
+// --ion-text-color y queda invisible sobre el fondo blanco de la tarjeta.
 .tarjeta {
   background: #ffffff;
+  color: #1f2430;
   border-radius: 16px;
   border-bottom-left-radius: 4px;
   padding: 14px;
@@ -151,74 +156,133 @@
   }
 }
 
+// ── Tarjetas de vista previa y resultado del Certificado (diseño premium) ──
+// Comparten el mismo lenguaje visual: franja superior degradada, insignia
+// circular, nombre destacado y datos en cuadrícula con etiquetas discretas.
 .tarjeta-preview,
 .tarjeta-certificado {
-  h3 {
-    margin: 0 0 8px;
-    font-size: 15px;
-    font-weight: 700;
-  }
+  position: relative;
+  overflow: hidden;
+  padding: 0 18px 16px;
+  border: 1px solid #e7e9f2;
+  background: #ffffff;
+  box-shadow: 0 4px 18px rgba(39, 67, 134, 0.08);
 
-  ul {
-    list-style: none;
-    margin: 0 0 12px;
-    padding: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    font-size: 13.5px;
-
-    li strong {
-      color: var(--ion-color-primary);
-    }
+  ion-button {
+    margin-top: 4px;
   }
 }
 
-.tarjeta-certificado {
-  border: 1px dashed var(--ion-color-primary);
-  background: linear-gradient(180deg, #f5f8ff, #ffffff);
+.tarjeta-preview .franja-superior,
+.tarjeta-certificado .franja-superior {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 5px;
+  background: linear-gradient(90deg, var(--ion-color-primary), var(--ion-color-secondary));
 }
 
 .encabezado-certificado {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-  color: var(--ion-color-primary);
-  margin-bottom: 6px;
+  gap: 10px;
+  padding-top: 18px;
+  margin-bottom: 14px;
 
-  ion-icon {
-    font-size: 16px;
-    color: var(--ion-color-secondary);
+  .insignia {
+    flex: 0 0 auto;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, var(--ion-color-secondary), var(--ion-color-secondary-tint, #ff8f4d));
+
+    ion-icon {
+      font-size: 16px;
+      color: #ffffff;
+    }
+  }
+
+  .titulo-certificado {
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--ion-color-primary);
   }
 }
 
 .nombre-certificado {
-  font-size: 16px;
-  font-weight: 700;
-  margin: 0 0 10px;
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  color: #1f2430;
+  margin: 0 0 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #eef0f5;
+}
+
+.grid-detalle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 16px;
+  margin-bottom: 14px;
+
+  .campo {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .campo-ancho {
+    grid-column: 1 / -1;
+  }
+
+  .etiqueta {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    color: #9aa1b4;
+  }
+
+  .valor {
+    font-size: 13.5px;
+    font-weight: 600;
+    color: #1f2430;
+  }
 }
 
 .zona-qr {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
-  padding-top: 6px;
-  border-top: 1px solid #eef0f5;
+  gap: 8px;
+  padding: 16px 0;
+  border-top: 1px dashed #dde1ec;
+  border-bottom: 1px dashed #dde1ec;
 
-  img {
-    width: 150px;
-    height: 150px;
+  .marco-qr {
+    padding: 10px;
+    background: #f7f9fd;
+    border: 1px solid #e7e9f2;
+    border-radius: 14px;
+
+    img {
+      display: block;
+      width: 132px;
+      height: 132px;
+    }
   }
 
   .codigo-qr {
     font-family: monospace;
-    font-size: 12px;
-    letter-spacing: 0.5px;
-    color: #6b7280;
+    font-size: 11px;
+    letter-spacing: 0.4px;
+    color: #9aa1b4;
   }
 }
 

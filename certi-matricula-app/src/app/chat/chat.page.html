@@ -58,14 +58,20 @@
           <img src="assets/icon/yavibot-avatar.png" alt="YaviBot" />
         </div>
         <div class="tarjeta tarjeta-preview">
-          <h3>Certificado de matrícula</h3>
-          <ul>
-            <li><strong>Nombre:</strong> {{ m.estudiante?.nombres }} {{ m.estudiante?.apellidos }}</li>
-            <li><strong>Cédula:</strong> {{ m.estudiante?.cedula }}</li>
-            <li><strong>Carrera:</strong> {{ m.estudiante?.carrera }}</li>
-            <li><strong>Nivel:</strong> {{ m.estudiante?.nivel }}</li>
-            <li><strong>Periodo:</strong> {{ m.estudiante?.periodoActual }}</li>
-          </ul>
+          <div class="franja-superior"></div>
+          <div class="encabezado-certificado">
+            <div class="insignia">
+              <ion-icon name="school-outline"></ion-icon>
+            </div>
+            <span class="titulo-certificado">Verifica tus datos</span>
+          </div>
+          <p class="nombre-certificado">{{ m.estudiante?.nombres }} {{ m.estudiante?.apellidos }}</p>
+          <div class="grid-detalle">
+            <div class="campo"><span class="etiqueta">Cédula</span><span class="valor">{{ m.estudiante?.cedula }}</span></div>
+            <div class="campo"><span class="etiqueta">Nivel</span><span class="valor">{{ m.estudiante?.nivel }}</span></div>
+            <div class="campo campo-ancho"><span class="etiqueta">Carrera</span><span class="valor">{{ m.estudiante?.carrera }}</span></div>
+            <div class="campo campo-ancho"><span class="etiqueta">Periodo</span><span class="valor">{{ m.estudiante?.periodoActual }}</span></div>
+          </div>
           <ion-button
             expand="block"
             color="secondary"
@@ -82,20 +88,25 @@
           <img src="assets/icon/yavibot-avatar.png" alt="YaviBot" />
         </div>
         <div class="tarjeta tarjeta-certificado">
+          <div class="franja-superior"></div>
           <div class="encabezado-certificado">
-            <ion-icon name="ribbon-outline"></ion-icon>
-            <span>CERTIFICADO DE MATRÍCULA</span>
+            <div class="insignia">
+              <ion-icon name="ribbon-outline"></ion-icon>
+            </div>
+            <span class="titulo-certificado">Certificado de Matrícula</span>
           </div>
           <p class="nombre-certificado">{{ m.certificado?.nombreCompleto }}</p>
-          <ul>
-            <li><strong>Cédula:</strong> {{ m.certificado?.cedula }}</li>
-            <li><strong>Carrera:</strong> {{ m.certificado?.carrera }}</li>
-            <li><strong>Nivel:</strong> {{ m.certificado?.nivel }}</li>
-            <li><strong>Periodo:</strong> {{ m.certificado?.periodoActual }}</li>
-            <li><strong>Fecha de emisión:</strong> {{ m.certificado?.fechaEmision }}</li>
-          </ul>
+          <div class="grid-detalle">
+            <div class="campo"><span class="etiqueta">Cédula</span><span class="valor">{{ m.certificado?.cedula }}</span></div>
+            <div class="campo"><span class="etiqueta">Nivel</span><span class="valor">{{ m.certificado?.nivel }}</span></div>
+            <div class="campo campo-ancho"><span class="etiqueta">Carrera</span><span class="valor">{{ m.certificado?.carrera }}</span></div>
+            <div class="campo"><span class="etiqueta">Periodo</span><span class="valor">{{ m.certificado?.periodoActual }}</span></div>
+            <div class="campo"><span class="etiqueta">Emisión</span><span class="valor">{{ m.certificado?.fechaEmision }}</span></div>
+          </div>
           <div class="zona-qr">
-            <img [src]="m.qrDataUrl" alt="Código QR único del certificado" />
+            <div class="marco-qr">
+              <img [src]="m.qrDataUrl" alt="Código QR único del certificado" />
+            </div>
             <span class="codigo-qr">{{ m.certificado?.codigoUnico }}</span>
           </div>
           <div class="aviso-correo">
