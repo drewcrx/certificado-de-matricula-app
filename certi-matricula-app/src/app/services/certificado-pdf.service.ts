@@ -71,14 +71,10 @@ export class CertificadoPdfService {
     //        a doble espacio, con tabulador y cursiva parcial ─────────────────
     Y += this.LH * 0.6;
 
-    const anioMatch  = certificado.periodoActual.match(/\d{4}/);
-    const anioFin    = anioMatch ? anioMatch[0] : '';
-    const anioInicio = anioFin ? String(parseInt(anioFin, 10) - 1) : '';
-
     const seg2: Segmento[] = [
-      { texto: 'As\u00ED mismo debo informar, que inici\u00F3 sus estudios acad\u00E9micos en: Primer nivel' },
+      { texto: `As\u00ED mismo debo informar, que inici\u00F3 sus estudios acad\u00E9micos en: ${certificado.nivelIngreso}` },
       { tab: true },
-      { texto: `${anioInicio}-II (agosto ${anioInicio}-febrero ${anioFin}) ` },
+      { texto: `${certificado.periodoIngresoCodigo} (${certificado.periodoIngresoNombre}) ` },
       { texto: `Se emite este certificado en Quito, a los ${certificado.fechaEmision}.`, italic: true },
     ];
     Y = this.renderParrafo(doc, seg2, this.P2_X, this.P2_RIGHT_EDGE, Y, this.LH2, /* justificar */ false);

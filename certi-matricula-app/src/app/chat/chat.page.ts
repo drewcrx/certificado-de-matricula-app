@@ -1,4 +1,5 @@
 import { Component, NgZone, OnInit, ViewChild } from '@angular/core';
+import { HttpErrorResponse } from '@angular/common/http';
 import { IonContent } from '@ionic/angular';
 import * as QRCode from 'qrcode';
 import { firstValueFrom } from 'rxjs';
@@ -385,7 +386,8 @@ export class ChatPage implements OnInit {
     this.estado = 'procesando_anulacion';
 
     if (!(await this.requiereConexion())) {
-      this.estado = 'confirmando_anulacion';
+      this.agregarMensaje({ tipo: 'bot-opciones' });
+      this.estado = 'menu';
       return;
     }
 
@@ -406,8 +408,12 @@ export class ChatPage implements OnInit {
         this.agregarMensaje({ tipo: 'bot-opciones' });
         this.estado = 'menu';
       },
-      error: async () => {
+      error: async (error: HttpErrorResponse) => {
         this.quitarEscribiendo();
+        if (error.status === 403) {
+          await this.manejarSesionExpirada();
+          return;
+        }
         await this.hablar('No pude registrar tu solicitud en este momento. Intenta nuevamente en unos segundos, o elige otra opción.');
         this.agregarMensaje({ tipo: 'bot-opciones' });
         this.estado = 'menu';
@@ -444,7 +450,8 @@ export class ChatPage implements OnInit {
     this.estado = 'procesando_reseteo_correo';
 
     if (!(await this.requiereConexion())) {
-      this.estado = 'confirmando_reseteo_correo';
+      this.agregarMensaje({ tipo: 'bot-opciones' });
+      this.estado = 'menu';
       return;
     }
 
@@ -457,8 +464,12 @@ export class ChatPage implements OnInit {
         this.agregarMensaje({ tipo: 'bot-opciones' });
         this.estado = 'menu';
       },
-      error: async () => {
+      error: async (error: HttpErrorResponse) => {
         this.quitarEscribiendo();
+        if (error.status === 403) {
+          await this.manejarSesionExpirada();
+          return;
+        }
         await this.hablar('No pude completar el reseteo en este momento. Intenta nuevamente en unos segundos, o elige otra opción.');
         this.agregarMensaje({ tipo: 'bot-opciones' });
         this.estado = 'menu';
@@ -497,8 +508,12 @@ export class ChatPage implements OnInit {
         this.agregarMensaje({ tipo: 'bot-opciones' });
         this.estado = 'menu';
       },
-      error: async () => {
+      error: async (error: HttpErrorResponse) => {
         this.quitarEscribiendo();
+        if (error.status === 403) {
+          await this.manejarSesionExpirada();
+          return;
+        }
         await this.hablar('No pude consultar tus tickets en este momento. Intenta nuevamente en unos segundos.');
         this.agregarMensaje({ tipo: 'bot-opciones' });
         this.estado = 'menu';
@@ -520,7 +535,8 @@ export class ChatPage implements OnInit {
     this.estado = 'generando_certificado';
 
     if (!(await this.requiereConexion())) {
-      this.estado = 'preview_certificado';
+      this.agregarMensaje({ tipo: 'bot-opciones' });
+      this.estado = 'menu';
       return;
     }
 
@@ -556,9 +572,19 @@ export class ChatPage implements OnInit {
         this.agregarMensaje({ tipo: 'bot-opciones' });
         this.estado = 'menu';
       },
-      error: async () => {
+      error: async (error: HttpErrorResponse) => {
         this.quitarEscribiendo();
-        await this.hablar('No pude generar el certificado en este momento. Intenta nuevamente en unos segundos, o elige otra opción.');
+        if (error.status === 403) {
+          await this.manejarSesionExpirada();
+          return;
+        }
+        if (error.status === 400) {
+          await this.hablar(
+            error.error?.error ?? 'No puedes generar el certificado: no apareces matriculado en el periodo actual.'
+          );
+        } else {
+          await this.hablar('No pude generar el certificado en este momento. Intenta nuevamente en unos segundos, o elige otra opción.');
+        }
         this.agregarMensaje({ tipo: 'bot-opciones' });
         this.estado = 'menu';
       }
@@ -696,7 +722,8 @@ export class ChatPage implements OnInit {
     this.estado = 'reportando_incidencia';
 
     if (!(await this.requiereConexion())) {
-      this.estado = 'confirmando_incidencia';
+      this.agregarMensaje({ tipo: 'bot-opciones' });
+      this.estado = 'menu';
       return;
     }
 
@@ -716,8 +743,12 @@ export class ChatPage implements OnInit {
           this.agregarMensaje({ tipo: 'bot-opciones' });
           this.estado = 'menu';
         },
-        error: async () => {
+        error: async (error: HttpErrorResponse) => {
           this.quitarEscribiendo();
+          if (error.status === 403) {
+            await this.manejarSesionExpirada();
+            return;
+          }
           await this.hablar('No pude registrar tu reporte en este momento. Intenta nuevamente en unos segundos, o elige otra opción.');
           this.agregarMensaje({ tipo: 'bot-opciones' });
           this.estado = 'menu';
@@ -751,6 +782,18 @@ export class ChatPage implements OnInit {
     }
     this.agregarMensaje({ tipo: 'bot-opciones' });
     this.estado = 'menu';
+  }
+
+  /**
+   * El backend exige una verificación OTP reciente (últimos 20 min) antes de
+   * ejecutar acciones sensibles; si expiró, responde 403. En vez de dejar al
+   * usuario en un bucle de "intenta de nuevo" que va a seguir fallando hasta
+   * que vuelva a verificarse, se reinicia la conversación directamente para
+   * que repita cédula + ticket con una sesión nueva.
+   */
+  private async manejarSesionExpirada(): Promise<void> {
+    await this.hablar('🔒 Por seguridad, tu verificación anterior ya expiró. Vamos a comenzar de nuevo para confirmar tu identidad.');
+    await this.iniciarConversacion();
   }
 
   /**

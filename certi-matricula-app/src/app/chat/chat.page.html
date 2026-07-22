@@ -303,7 +303,7 @@
         [disabled]="estado === 'consultando'"
         (keyup.enter)="enviarCedula()">
       </ion-input>
-      <ion-button slot="end" fill="clear" [disabled]="!puedeEnviarCedula" (click)="enviarCedula()">
+      <ion-button slot="end" class="boton-enviar-input" [disabled]="!puedeEnviarCedula" (click)="enviarCedula()">
         <ion-icon slot="icon-only" name="send-outline"></ion-icon>
       </ion-button>
     </ion-item>
@@ -320,7 +320,7 @@
         [disabled]="estado === 'validando_ticket'"
         (keyup.enter)="verificarTicketIngresado()">
       </ion-input>
-      <ion-button slot="end" fill="clear" [disabled]="!puedeVerificarTicket" (click)="verificarTicketIngresado()">
+      <ion-button slot="end" class="boton-enviar-input" [disabled]="!puedeVerificarTicket" (click)="verificarTicketIngresado()">
         <ion-icon slot="icon-only" name="send-outline"></ion-icon>
       </ion-button>
     </ion-item>
@@ -342,7 +342,7 @@
         [autoGrow]="true"
         rows="2">
       </ion-textarea>
-      <ion-button slot="end" fill="clear" [disabled]="!puedeEnviarDescripcionIncidencia" (click)="enviarDescripcionIncidencia()">
+      <ion-button slot="end" class="boton-enviar-input" [disabled]="!puedeEnviarDescripcionIncidencia" (click)="enviarDescripcionIncidencia()">
         <ion-icon slot="icon-only" name="send-outline"></ion-icon>
       </ion-button>
     </ion-item>

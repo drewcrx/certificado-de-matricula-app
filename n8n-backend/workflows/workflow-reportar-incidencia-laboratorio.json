@@ -151,6 +151,89 @@
       "parameters": {
         "operation": "executeQuery",
         "resource": "database",
+        "query": "SELECT 1 AS ok FROM otp_codigos WHERE cedula = $1 AND usado = true AND creado_en > NOW() - INTERVAL '20 minutes' ORDER BY creado_en DESC LIMIT 1",
+        "options": {
+          "queryReplacement": "={{ [ $('Webhook').item.json.body.cedula ] }}"
+        }
+      },
+      "id": "ises0001-ses0-4ses-8ses-ses000000001",
+      "name": "Verificar Sesión Validada (Postgres)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        980,
+        180
+      ],
+      "alwaysOutputData": true,
+      "notes": "Exige un OTP usado=true en los últimos 20 min para esta cédula (mismo patrón que resetear-contrasena-correo.json) — sin esto, cualquiera con la cédula y la X-Api-Key podía reportar la incidencia saltándose el OTP.",
+      "credentials": {
+        "postgres": {
+          "id": "REEMPLAZAR",
+          "name": "REEMPLAZAR con credenciales reales"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "cond1",
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": "",
+              "operator": {
+                "type": "number",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "ises0002-ses0-4ses-8ses-ses000000002",
+      "name": "¿Tiene sesión válida?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1240,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"error\": \"Debes verificar tu identidad nuevamente antes de continuar.\" } }}",
+        "options": {
+          "responseCode": 403,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "ises0003-ses0-4ses-8ses-ses000000003",
+      "name": "Responder: Sin sesión válida",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1500,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "resource": "database",
         "query": "SELECT id FROM laboratorios WHERE codigo = $1",
         "options": {
           "queryReplacement": "={{ [ $('Webhook').item.json.body.laboratorioCodigo ] }}"
@@ -283,10 +366,12 @@
       "name": "Escribir Foto en Disco",
       "type": "n8n-nodes-base.readWriteFile",
       "typeVersion": 1,
+      "onError": "continueRegularOutput",
       "position": [
         2280,
         -420
-      ]
+      ],
+      "notes": "onError=continueRegularOutput: la foto es opcional — si falla el guardado en disco (ej. disco lleno), no debe perderse el reporte de incidencia completo. 'Foto Guardada' resuelve adjuntoId a null si esta rama falló."
     },
     {
       "parameters": {
@@ -301,10 +386,12 @@
       "name": "Insertar Adjunto (Postgres)",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
+      "onError": "continueRegularOutput",
       "position": [
         2540,
         -420
       ],
+      "notes": "onError=continueRegularOutput: mismo criterio que 'Escribir Foto en Disco' — un fallo al registrar el adjunto no debe tumbar el reporte de incidencia.",
       "credentials": {
         "postgres": {
           "id": "REEMPLAZAR",
@@ -314,7 +401,7 @@
     },
     {
       "parameters": {
-        "jsCode": "return [{ json: { adjuntoId: $json.id } }];"
+        "jsCode": "// $json.id solo viene presente si \"Escribir Foto en Disco\" e \"Insertar Adjunto\"\n// se completaron de verdad; si cualquiera de las dos falló (onError=continueRegularOutput),\n// $json no trae 'id' y se guarda el reporte igual, sin foto.\nreturn [{ json: { adjuntoId: $json.id ?? null } }];"
       },
       "id": "ihhhhhh5-hhhh-4hhh-8hhh-hhhhhhhhhhh5",
       "name": "Foto Guardada",
@@ -697,7 +784,7 @@
       "main": [
         [
           {
-            "node": "Buscar Laboratorio (Postgres)",
+            "node": "Verificar Sesión Validada (Postgres)",
             "type": "main",
             "index": 0
           }
@@ -705,6 +792,35 @@
         [
           {
             "node": "Responder: Docente no encontrado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verificar Sesión Validada (Postgres)": {
+      "main": [
+        [
+          {
+            "node": "¿Tiene sesión válida?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Tiene sesión válida?": {
+      "main": [
+        [
+          {
+            "node": "Buscar Laboratorio (Postgres)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder: Sin sesión válida",
             "type": "main",
             "index": 0
           }

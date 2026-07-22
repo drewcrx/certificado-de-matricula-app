@@ -94,9 +94,92 @@
       "parameters": {
         "operation": "executeQuery",
         "resource": "database",
-        "query": "SELECT cedula, nombres, correo AS \"correoInstitucional\" FROM estudiantes WHERE cedula = $1",
+        "query": "SELECT 1 AS ok FROM otp_codigos WHERE cedula = $1 AND creado_en > NOW() - INTERVAL '60 seconds' ORDER BY creado_en DESC LIMIT 1",
         "options": {
           "queryReplacement": "={{ [ $json.body.cedula ] }}"
+        }
+      },
+      "id": "cool0001-cool-4ool-8ool-cool00000001",
+      "name": "Verificar Cooldown OTP (Postgres)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        460,
+        -300
+      ],
+      "alwaysOutputData": true,
+      "notes": "Sin esto, este endpoint no tenía CAPTCHA ni límite de frecuencia propio: cualquiera con la X-Api-Key podía hacer que el sistema mandara el código OTP repetidamente al correo institucional de cualquier cédula conocida (spam). Cooldown de 60s entre envíos por cédula.",
+      "credentials": {
+        "postgres": {
+          "id": "REEMPLAZAR",
+          "name": "REEMPLAZAR con credenciales reales"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "cond1",
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": "",
+              "operator": {
+                "type": "number",
+                "operation": "empty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "cool0002-cool-4ool-8ool-cool00000002",
+      "name": "¿Puede enviar OTP ahora?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        720,
+        -300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"error\": \"Ya enviamos un código hace unos segundos. Espera un momento antes de solicitar uno nuevo.\" } }}",
+        "options": {
+          "responseCode": 429,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "cool0003-cool-4ool-8ool-cool00000003",
+      "name": "Responder: Cooldown activo",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        980,
+        -460
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "resource": "database",
+        "query": "SELECT cedula, nombres, correo AS \"correoInstitucional\" FROM estudiantes WHERE cedula = $1",
+        "options": {
+          "queryReplacement": "={{ [ $('Webhook').item.json.body.cedula ] }}"
         }
       },
       "id": "c3333333-3333-4333-8333-333333333333",
@@ -321,7 +404,36 @@
       "main": [
         [
           {
+            "node": "Verificar Cooldown OTP (Postgres)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verificar Cooldown OTP (Postgres)": {
+      "main": [
+        [
+          {
+            "node": "¿Puede enviar OTP ahora?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Puede enviar OTP ahora?": {
+      "main": [
+        [
+          {
             "node": "Buscar Estudiante (Postgres)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder: Cooldown activo",
             "type": "main",
             "index": 0
           }

@@ -20,12 +20,25 @@ POST real y la app se queda sin respuesta.
 header `X-Api-Key` con el valor configurado en `environment.apiKey` (la app
 ya lo agrega automáticamente en cada petición vía `ApiKeyInterceptor`). Sin
 este header, n8n responde `403` antes de ejecutar cualquier lógica del
-workflow — esto evita que alguien que descubra la URL pública (una vez
-desplegada en el VPS) pueda consultar datos de estudiantes o crear
-certificados/tickets directamente, sin pasar por la app. El webhook `OPTIONS`
-de cada workflow queda sin autenticación (el preflight del navegador no
-puede incluir headers personalizados), pero eso solo responde un `204` vacío
-sin tocar la base de datos.
+workflow — esto filtra tráfico casual/automatizado que no pase por la app
+(bots, escaneos genéricos). **Ojo:** esta clave viaja en texto plano dentro
+del bundle JS de la app, así que cualquiera que la inspeccione (web o APK)
+puede extraerla en minutos — no es un secreto real de cliente-a-cliente,
+solo la primera barrera. El webhook `OPTIONS` de cada workflow queda sin
+autenticación (el preflight del navegador no puede incluir headers
+personalizados), pero eso solo responde un `204` vacío sin tocar la base de
+datos.
+
+**Por eso la protección real contra "conozco la cédula de alguien y quiero
+actuar en su nombre" es la sesión OTP**, no la `X-Api-Key`: los endpoints que
+modifican datos o exponen información personal (`/generar-certificado-matricula`,
+`/enviar-certificado-pdf`, `/crear-ticket-solicitud`, `/consultar-tickets`,
+`/reportar-incidencia-laboratorio`, `/resetear-contrasena-correo`) exigen
+además un OTP verificado (`otp_codigos.usado = true`) en los últimos 20
+minutos para esa cédula — sin eso, responden `403`. `/consultar-estudiante`
+(el único paso sin OTP previo) se protege en cambio con reCAPTCHA v2, porque
+ahí es donde se puede intentar enumerar cédulas. Ver el detalle de cada
+chequeo en su propia sección más abajo.
 
 ---
 
@@ -152,6 +165,12 @@ Reglas importantes para el backend:
   respuesta de este endpoint en producción (en pruebas con Mailtrap, el
   correo real se ve directo en el buzón de Mailtrap, no hace falta debug).
 - Si la cédula no existe, responder con error (4xx).
+- **Cooldown de 60 segundos por cédula** (nodo "Verificar Cooldown OTP",
+  responde 429 si ya se envió un OTP a esa cédula en los últimos 60s). Este
+  endpoint no tiene CAPTCHA propio (solo el de `/consultar-estudiante`), así
+  que sin este límite cualquiera con la `X-Api-Key` podía hacer que el
+  sistema mandara el código repetidamente al correo institucional de
+  cualquier cédula conocida.
 
 ---
 
@@ -208,10 +227,22 @@ e irrepetible** que luego se convierte en QR.
   "nivel": "Octavo Nivel",
   "periodoActual": "Abril 2026 - Agosto 2026",
   "modalidad": "DUAL",
+  "nivelIngreso": "Primer nivel",
+  "periodoIngresoCodigo": "2025-II",
+  "periodoIngresoNombre": "agosto 2025-febrero 2026",
   "fechaEmision": "15 de julio de 2026",
   "urlVerificacion": "https://verificacion.tudominio.edu.ec/certificados/744c7cb9-ab6f-46ce-9440-3d1da1c54798"
 }
 ```
+
+- `nivelIngreso`/`periodoIngresoCodigo`/`periodoIngresoNombre` vienen de
+  `estudiantes.nivel_ingreso` y del periodo real de ingreso (JOIN a
+  `periodos_academicos` por `periodo_ingreso_id`) — son los datos reales que
+  `certificado-pdf.service.ts` usa para la frase "inició sus estudios
+  académicos en...". Antes de que este campo existiera, la app reconstruía
+  esa fecha algorítmicamente a partir del periodo **actual** (restando un
+  año), lo cual era incorrecto para cualquier estudiante que no estuviera en
+  su primer nivel — quedó corregido usando el dato real.
 
 Reglas importantes para el backend:
 
@@ -266,6 +297,22 @@ Reglas importantes para el backend:
 }
 ```
 
+### Response — 403 (sin sesión OTP válida reciente)
+
+```json
+{
+  "error": "Debes verificar tu identidad nuevamente antes de continuar."
+}
+```
+
+**Requiere sesión OTP reciente.** El workflow exige un `otp_codigos.usado =
+true` para esa cédula dentro de los últimos 20 minutos (nodo "Verificar
+Sesión Validada", mismo patrón que `/resetear-contrasena-correo`, ver §6.1).
+Sin esto, cualquiera que conociera la cédula del estudiante y la `X-Api-Key`
+de la app (extraíble del bundle) podía llamar este endpoint directo y generar
+el certificado saltándose por completo el paso de OTP — este chequeo lo
+cierra.
+
 ---
 
 ## 4.1 Enviar certificado en PDF por correo
@@ -305,8 +352,16 @@ Reglas importantes:
 - El workflow (`workflow-enviar-certificado-pdf.json`) **verifica en la BD**
   que ese `codigoUnico` realmente pertenece a esa `cedula` (join
   `certificados` + `qr_codigos` + `estudiantes`) antes de enviar nada — así
-  no se puede usar este endpoint para mandar un PDF arbitrario a cualquier
-  correo.
+  el correo de destino siempre es el institucional real del estudiante
+  dueño de ese certificado, nunca uno arbitrario.
+- **También requiere sesión OTP reciente** (mismo chequeo que §4 — 403 si no
+  hay un `otp_codigos.usado = true` de los últimos 20 min). El `pdfBase64`
+  del body es contenido que arma el cliente y el workflow no valida su
+  contenido; como el `codigoUnico` deja de ser secreto en cuanto el
+  certificado se comparte una vez (aparece en el propio QR), sin este
+  chequeo cualquiera que hubiera visto un certificado ya emitido podía hacer
+  que el sistema reenviara un PDF arbitrario al correo institucional del
+  estudiante, con remitente "oficial" (`no-reply@yavirac.edu.ec`).
 - El PDF llega en base64 y se convierte a un adjunto binario real
   (`Attachments (File)` del nodo Send Email) — no es una imagen incrustada,
   es el archivo PDF completo generado por `certificado-pdf.service.ts`.
@@ -359,6 +414,11 @@ administrativo ni intervención manual — ver "Workflows internos" más abajo
 (`detectar-respuesta-ticket`). Este endpoint no cambió en nada para
 soportarlo: simplemente lee `tickets.estado` en el momento de la consulta,
 así que refleja el cambio apenas ocurre, sin ningún ajuste de código.
+
+**Requiere sesión OTP reciente** (mismo chequeo que §4, 403 si no hay un
+`otp_codigos.usado = true` de los últimos 20 min para esa cédula) — sin
+esto, cualquiera con la cédula y la `X-Api-Key` podía leer el historial de
+trámites de otro estudiante saltándose el OTP.
 
 ---
 
@@ -456,6 +516,19 @@ se confirme con la coordinación académica.
   "error": "Tipo de trámite no reconocido."
 }
 ```
+
+### Response — 403 (sin sesión OTP válida reciente)
+
+```json
+{
+  "error": "Debes verificar tu identidad nuevamente antes de continuar."
+}
+```
+
+**Requiere sesión OTP reciente** (mismo chequeo que §4 — 403 si no hay un
+`otp_codigos.usado = true` de los últimos 20 min para esa cédula). Sin esto,
+cualquiera con la cédula y la `X-Api-Key` podía registrar una solicitud de
+anulación a nombre de otro estudiante saltándose el OTP.
 
 ---
 
@@ -734,7 +807,16 @@ Reglas importantes:
   escribe en disco (volumen `uploads_data`, ver `ARQUITECTURA.md` §"Fotos de
   incidencias") y solo entonces inserta la fila en `adjuntos` y enlaza
   `adjunto_id` — nunca se guarda el binario en Postgres.
+  **Si el guardado en disco o el insert en `adjuntos` fallan** (`onError:
+  continueRegularOutput` en ambos nodos), el reporte se guarda igual con
+  `adjunto_id = NULL` en vez de perderse por completo — la foto es opcional,
+  su fallo no debe tumbar el reporte.
 - No hay límite de incidencias simultáneas por docente (a diferencia de
   Anulación de Matrícula) — cada incidencia es un evento distinto, un
   docente puede reportar varias sin que una bloquee a la otra.
+- **Requiere sesión OTP reciente** (mismo chequeo que §4 — 403 `{"error":
+  "Debes verificar tu identidad nuevamente antes de continuar."}` si no hay
+  un `otp_codigos.usado = true` de los últimos 20 min para esa cédula). Sin
+  esto, cualquiera con la cédula de un docente y la `X-Api-Key` podía
+  reportar incidencias a su nombre saltándose el OTP.
 

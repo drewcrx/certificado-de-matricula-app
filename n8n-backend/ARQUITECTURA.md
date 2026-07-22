@@ -119,6 +119,27 @@ envelope `{success, data}`) por consistencia con lo ya construido:
 - **Pendiente**: rotar la `X-Api-Key` de desarrollo antes de ir a
   producción, y moverla a un secreto real (no un valor plano en
   `environment.prod.ts`) cuando exista un pipeline de build que lo permita.
+- **Sesión OTP como autorización real por-usuario — ✅ implementado
+  (2026-07-22).** La `X-Api-Key` es la misma para todos los usuarios y vive
+  en texto plano en el bundle de la app — no distingue "quién" está
+  llamando, solo "algo que pasa por la app". Por eso los endpoints que
+  actúan en nombre de un estudiante/docente específico
+  (`generar-certificado-matricula`, `enviar-certificado-pdf`,
+  `crear-ticket-solicitud`, `consultar-tickets`,
+  `reportar-incidencia-laboratorio`) exigen además un OTP verificado
+  (`otp_codigos.usado = true`, últimos 20 min) para esa cédula — mismo
+  patrón que ya traía `resetear-contrasena-correo` desde su diseño
+  original. Sin la sesión OTP responden 403; la app detecta ese 403 y
+  reinicia la conversación para pedir cédula + OTP de nuevo
+  (`manejarSesionExpirada()` en `chat.page.ts`).
+- **`enviar-ticket-verificacion` tiene cooldown de 60s por cédula** — es el
+  único paso de envío de OTP y no tiene CAPTCHA propio (solo
+  `consultar-estudiante` lo tiene), así que sin el cooldown se podía usar
+  para mandar correos de OTP repetidamente a cualquier cédula conocida.
+- **`verificar-certificado` (página pública, sin login) enmascara la
+  cédula** en la respuesta (`175****314`) — es la única cédula visible sin
+  autenticación en todo el sistema, mismo criterio que ya se usaba para
+  enmascarar correos.
 
 ---
 
@@ -179,6 +200,20 @@ administrativo), en vez de al Postgres local de Docker:
    VPS antes de producción, o los certificados ya emitidos en desarrollo
    quedarían con un QR roto. `environment.prod.ts` (n8nBaseUrl) también debe
    apuntar al dominio real, no a `localhost`.
+8. **Agregar rate-limiting por IP en el proxy/infraestructura del VPS** (ej.
+   `nginx limit_req`, o el rate-limiting nativo de Cloudflare si el dominio
+   pasa por ahí) — sobre todo para `/consultar-estudiante`, el único
+   endpoint sin OTP previo (solo CAPTCHA). El CAPTCHA valida que quien llama
+   "parece humano", pero no limita CUÁNTAS veces puede llamar en un periodo
+   de tiempo — con tráfico que reCAPTCHA considera de bajo riesgo (pasa sin
+   desafío visual) se podría enumerar cédulas válidas (el algoritmo módulo
+   10 es público) y extraer datos de estudiantes reales (nombre, carrera,
+   nivel, correo institucional, estado de matrícula) sin romper el CAPTCHA,
+   solo abusando del volumen. No se implementó a nivel de n8n/Postgres a
+   propósito: un contador ahí es fácil de evadir y quedaría redundante con
+   el rate-limiting real del proxy, que es el lugar correcto para esto
+   (evaluado y descartado explícitamente el 2026-07-22 mientras no exista
+   VPS/dominio — no hay exposición pública real todavía).
 
 ---
 

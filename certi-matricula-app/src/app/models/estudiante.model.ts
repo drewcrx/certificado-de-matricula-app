@@ -52,6 +52,12 @@ export interface CertificadoMatricula {
   nivel: string;
   periodoActual: string;
   modalidad: string;
+  /** Nivel real con el que el estudiante inició sus estudios (ej. "Primer nivel"). */
+  nivelIngreso: string;
+  /** Código del periodo de ingreso real (ej. "2025-II"). */
+  periodoIngresoCodigo: string;
+  /** Nombre/rango de fechas del periodo de ingreso real (ej. "agosto 2025-febrero 2026"). */
+  periodoIngresoNombre: string;
   fechaEmision: string;
   urlVerificacion: string;
 }

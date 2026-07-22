@@ -215,6 +215,9 @@ export class EstudianteService {
         nivel: estudiante.nivel,
         periodoActual: estudiante.periodoActual,
         modalidad: 'DUAL',
+        nivelIngreso: 'Primer nivel',
+        periodoIngresoCodigo: '2025-II',
+        periodoIngresoNombre: 'agosto 2025-febrero 2026',
         fechaEmision: new Date().toLocaleDateString('es-EC', {
           year: 'numeric',
           month: 'long',

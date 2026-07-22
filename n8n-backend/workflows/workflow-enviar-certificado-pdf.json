@@ -149,7 +149,90 @@
     },
     {
       "parameters": {
-        "jsCode": "const cedula = $('Webhook').item.json.body.cedula;\nconst pdfBase64 = $('Webhook').item.json.body.pdfBase64;\n\nreturn [{\n  json: $json,\n  binary: {\n    certificado: {\n      data: pdfBase64,\n      mimeType: 'application/pdf',\n      fileName: `certificado-matricula-${cedula}.pdf`\n    }\n  }\n}];"
+        "operation": "executeQuery",
+        "resource": "database",
+        "query": "SELECT 1 AS ok FROM otp_codigos WHERE cedula = $1 AND usado = true AND creado_en > NOW() - INTERVAL '20 minutes' ORDER BY creado_en DESC LIMIT 1",
+        "options": {
+          "queryReplacement": "={{ [ $('Webhook').item.json.body.cedula ] }}"
+        }
+      },
+      "id": "fses0001-ses0-4ses-8ses-ses000000001",
+      "name": "Verificar Sesión Validada (Postgres)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        980,
+        180
+      ],
+      "alwaysOutputData": true,
+      "notes": "Exige un OTP usado=true en los últimos 20 min. El PDF que llega en el body es generado por el cliente y no se valida su contenido — sin esta verificación, cualquiera con (cedula, codigoUnico) de un certificado ya emitido (visible en el propio QR) podía hacer que el sistema reenviara un PDF arbitrario al correo institucional del estudiante, sin haber pasado por el OTP.",
+      "credentials": {
+        "postgres": {
+          "id": "REEMPLAZAR",
+          "name": "REEMPLAZAR con credenciales reales"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "cond1",
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": "",
+              "operator": {
+                "type": "number",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "fses0002-ses0-4ses-8ses-ses000000002",
+      "name": "¿Tiene sesión válida?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1240,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"error\": \"Debes verificar tu identidad nuevamente antes de continuar.\" } }}",
+        "options": {
+          "responseCode": 403,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "fses0003-ses0-4ses-8ses-ses000000003",
+      "name": "Responder: Sin sesión válida",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1500,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const cedula = $('Webhook').item.json.body.cedula;\nconst pdfBase64 = $('Webhook').item.json.body.pdfBase64;\nconst certificado = $('Verificar Certificado (Postgres)').item.json;\n\nreturn [{\n  json: certificado,\n  binary: {\n    certificado: {\n      data: pdfBase64,\n      mimeType: 'application/pdf',\n      fileName: `certificado-matricula-${cedula}.pdf`\n    }\n  }\n}];"
       },
       "id": "f6666666-6666-4666-8666-666666666666",
       "name": "Adjuntar PDF (Binario)",
@@ -276,7 +359,7 @@
       "main": [
         [
           {
-            "node": "Adjuntar PDF (Binario)",
+            "node": "Verificar Sesión Validada (Postgres)",
             "type": "main",
             "index": 0
           }
@@ -284,6 +367,35 @@
         [
           {
             "node": "Responder: No encontrado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verificar Sesión Validada (Postgres)": {
+      "main": [
+        [
+          {
+            "node": "¿Tiene sesión válida?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Tiene sesión válida?": {
+      "main": [
+        [
+          {
+            "node": "Adjuntar PDF (Binario)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder: Sin sesión válida",
             "type": "main",
             "index": 0
           }

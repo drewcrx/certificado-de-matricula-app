@@ -151,9 +151,92 @@
       "parameters": {
         "operation": "executeQuery",
         "resource": "database",
+        "query": "SELECT 1 AS ok FROM otp_codigos WHERE cedula = $1 AND usado = true AND creado_en > NOW() - INTERVAL '20 minutes' ORDER BY creado_en DESC LIMIT 1",
+        "options": {
+          "queryReplacement": "={{ [ $('Webhook').item.json.body.cedula ] }}"
+        }
+      },
+      "id": "bses0001-ses0-4ses-8ses-ses000000001",
+      "name": "Verificar Sesión Validada (Postgres)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        980,
+        40
+      ],
+      "alwaysOutputData": true,
+      "notes": "Exige un OTP usado=true en los últimos 20 min para esta cédula (mismo patrón que resetear-contrasena-correo.json) — sin esto, cualquiera con la cédula y la X-Api-Key podía generar el certificado saltándose el OTP.",
+      "credentials": {
+        "postgres": {
+          "id": "REEMPLAZAR",
+          "name": "REEMPLAZAR con credenciales reales"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "cond1",
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": "",
+              "operator": {
+                "type": "number",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "bses0002-ses0-4ses-8ses-ses000000002",
+      "name": "¿Tiene sesión válida?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1240,
+        40
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"error\": \"Debes verificar tu identidad nuevamente antes de continuar.\" } }}",
+        "options": {
+          "responseCode": 403,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "bses0003-ses0-4ses-8ses-ses000000003",
+      "name": "Responder: Sin sesión válida",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1500,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "resource": "database",
         "query": "SELECT qc.identificador AS \"codigoUnico\", cert.fecha FROM certificados cert JOIN qr_codigos qc ON qc.id = cert.qr_id WHERE cert.estudiante_id = $1 AND cert.periodo_lectivo_codigo = $2 ORDER BY cert.creado_en DESC LIMIT 1",
         "options": {
-          "queryReplacement": "={{ [$json.estudiante_id, $json.periodo_codigo] }}"
+          "queryReplacement": "={{ [$('Buscar Estudiante (Postgres)').item.json.estudiante_id, $('Buscar Estudiante (Postgres)').item.json.periodo_codigo] }}"
         }
       },
       "id": "b9999999-9999-4999-8999-999999999999",
@@ -206,7 +289,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const estudiante = $('Buscar Estudiante (Postgres)').item.json;\nconst cert = $json;\n\n// cert.fecha es una columna DATE pura (sin hora ni zona horaria): se formatea\n// leyendo directamente los componentes YYYY-MM-DD del string, sin pasar por\n// un objeto Date/Intl (evita que una conversión de zona horaria le reste un\n// día, ya que una fecha sin hora no tiene un instante real que convertir).\nconst MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];\nconst fechaStr = typeof cert.fecha === 'string' ? cert.fecha : cert.fecha.toISOString();\nconst [anio, mes, dia] = fechaStr.slice(0, 10).split('-').map(Number);\nconst fechaEmision = `${String(dia).padStart(2, '0')} de ${MESES[mes - 1]} de ${anio}`;\nconst urlVerificacion = `http://localhost:4200/verificar-certificado/${cert.codigoUnico}`;\n\nreturn [{\n  json: {\n    codigoUnico: cert.codigoUnico,\n    cedula: estudiante.cedula,\n    nombreCompleto: estudiante.nombres,\n    carrera: estudiante.carrera,\n    nivel: estudiante.nivel,\n    periodoActual: estudiante.periodoActual,\n    modalidad: estudiante.modalidad,\n    fechaEmision,\n    urlVerificacion\n  }\n}];"
+        "jsCode": "const estudiante = $('Buscar Estudiante (Postgres)').item.json;\nconst cert = $json;\n\n// cert.fecha es una columna DATE pura (sin hora ni zona horaria): se formatea\n// leyendo directamente los componentes YYYY-MM-DD del string, sin pasar por\n// un objeto Date/Intl (evita que una conversión de zona horaria le reste un\n// día, ya que una fecha sin hora no tiene un instante real que convertir).\nconst MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];\nconst fechaStr = typeof cert.fecha === 'string' ? cert.fecha : cert.fecha.toISOString();\nconst [anio, mes, dia] = fechaStr.slice(0, 10).split('-').map(Number);\nconst fechaEmision = `${String(dia).padStart(2, '0')} de ${MESES[mes - 1]} de ${anio}`;\nconst urlVerificacion = `http://localhost:4200/verificar-certificado/${cert.codigoUnico}`;\n\nreturn [{\n  json: {\n    codigoUnico: cert.codigoUnico,\n    cedula: estudiante.cedula,\n    nombreCompleto: estudiante.nombres,\n    carrera: estudiante.carrera,\n    nivel: estudiante.nivel,\n    periodoActual: estudiante.periodoActual,\n    modalidad: estudiante.modalidad,\n    nivelIngreso: estudiante.nivel_ingreso,\n    periodoIngresoCodigo: estudiante.periodo_ingreso_codigo,\n    periodoIngresoNombre: estudiante.periodo_ingreso_nombre,\n    fechaEmision,\n    urlVerificacion\n  }\n}];"
       },
       "id": "bacacaca-caca-4aca-8aca-acacacacacac",
       "name": "Formatear Respuesta Existente",
@@ -292,7 +375,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const estudiante = $('Buscar Estudiante (Postgres)').item.json;\nconst qr = $('Crear QR (Postgres)').item.json;\nconst cert = $('Insertar Certificado (Postgres)').item.json;\n\n// cert.fecha es una columna DATE pura (sin hora ni zona horaria): se formatea\n// leyendo directamente los componentes YYYY-MM-DD del string, sin pasar por\n// un objeto Date/Intl (evita que una conversión de zona horaria le reste un\n// día, ya que una fecha sin hora no tiene un instante real que convertir).\nconst MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];\nconst fechaStr = typeof cert.fecha === 'string' ? cert.fecha : cert.fecha.toISOString();\nconst [anio, mes, dia] = fechaStr.slice(0, 10).split('-').map(Number);\nconst fechaEmision = `${String(dia).padStart(2, '0')} de ${MESES[mes - 1]} de ${anio}`;\nconst urlVerificacion = `http://localhost:4200/verificar-certificado/${qr.identificador}`;\n\nreturn [{\n  json: {\n    codigoUnico: qr.identificador,\n    cedula: estudiante.cedula,\n    nombreCompleto: estudiante.nombres,\n    carrera: estudiante.carrera,\n    nivel: estudiante.nivel,\n    periodoActual: estudiante.periodoActual,\n    modalidad: estudiante.modalidad,\n    fechaEmision,\n    urlVerificacion\n  }\n}];"
+        "jsCode": "const estudiante = $('Buscar Estudiante (Postgres)').item.json;\nconst qr = $('Crear QR (Postgres)').item.json;\nconst cert = $('Insertar Certificado (Postgres)').item.json;\n\n// cert.fecha es una columna DATE pura (sin hora ni zona horaria): se formatea\n// leyendo directamente los componentes YYYY-MM-DD del string, sin pasar por\n// un objeto Date/Intl (evita que una conversión de zona horaria le reste un\n// día, ya que una fecha sin hora no tiene un instante real que convertir).\nconst MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];\nconst fechaStr = typeof cert.fecha === 'string' ? cert.fecha : cert.fecha.toISOString();\nconst [anio, mes, dia] = fechaStr.slice(0, 10).split('-').map(Number);\nconst fechaEmision = `${String(dia).padStart(2, '0')} de ${MESES[mes - 1]} de ${anio}`;\nconst urlVerificacion = `http://localhost:4200/verificar-certificado/${qr.identificador}`;\n\nreturn [{\n  json: {\n    codigoUnico: qr.identificador,\n    cedula: estudiante.cedula,\n    nombreCompleto: estudiante.nombres,\n    carrera: estudiante.carrera,\n    nivel: estudiante.nivel,\n    periodoActual: estudiante.periodoActual,\n    modalidad: estudiante.modalidad,\n    nivelIngreso: estudiante.nivel_ingreso,\n    periodoIngresoCodigo: estudiante.periodo_ingreso_codigo,\n    periodoIngresoNombre: estudiante.periodo_ingreso_nombre,\n    fechaEmision,\n    urlVerificacion\n  }\n}];"
       },
       "id": "b5555555-5555-4555-8555-555555555555",
       "name": "Formatear Respuesta",
@@ -306,7 +389,7 @@
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ {\n  \"codigoUnico\": $json.codigoUnico,\n  \"cedula\": $json.cedula,\n  \"nombreCompleto\": $json.nombreCompleto,\n  \"carrera\": $json.carrera,\n  \"nivel\": $json.nivel,\n  \"periodoActual\": $json.periodoActual,\n  \"modalidad\": $json.modalidad,\n  \"fechaEmision\": $json.fechaEmision,\n  \"urlVerificacion\": $json.urlVerificacion\n} }}",
+        "responseBody": "={{ {\n  \"codigoUnico\": $json.codigoUnico,\n  \"cedula\": $json.cedula,\n  \"nombreCompleto\": $json.nombreCompleto,\n  \"carrera\": $json.carrera,\n  \"nivel\": $json.nivel,\n  \"periodoActual\": $json.periodoActual,\n  \"modalidad\": $json.modalidad,\n  \"nivelIngreso\": $json.nivelIngreso,\n  \"periodoIngresoCodigo\": $json.periodoIngresoCodigo,\n  \"periodoIngresoNombre\": $json.periodoIngresoNombre,\n  \"fechaEmision\": $json.fechaEmision,\n  \"urlVerificacion\": $json.urlVerificacion\n} }}",
         "options": {
           "responseCode": 200,
           "responseHeaders": {
@@ -473,7 +556,7 @@
       "main": [
         [
           {
-            "node": "Buscar Certificado Existente (Postgres)",
+            "node": "Verificar Sesión Validada (Postgres)",
             "type": "main",
             "index": 0
           }
@@ -481,6 +564,35 @@
         [
           {
             "node": "Responder: No matriculado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verificar Sesión Validada (Postgres)": {
+      "main": [
+        [
+          {
+            "node": "¿Tiene sesión válida?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Tiene sesión válida?": {
+      "main": [
+        [
+          {
+            "node": "Buscar Certificado Existente (Postgres)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder: Sin sesión válida",
             "type": "main",
             "index": 0
           }
