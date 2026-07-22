@@ -59,6 +59,7 @@ workflows/
   workflow-crear-ticket-solicitud.json         # dominio: trámites/tickets (genérico, estudiante)
   workflow-generar-certificado.json            # dominio: trámites/tickets (especializado, estudiante)
   workflow-enviar-certificado-pdf.json         # dominio: trámites/tickets (adjunto PDF por correo)
+  workflow-verificar-certificado.json          # dominio: trámites/tickets (público, sin login — QR = firma)
   workflow-resetear-contrasena-correo.json     # dominio: trámites (especializado, automático, estudiante)
   workflow-detectar-respuesta-ticket.json      # dominio: trámites/tickets (sin webhook — Gmail Trigger)
   workflow-consultar-laboratorios.json         # dominio: rol Docente (catálogo)
@@ -169,6 +170,15 @@ administrativo), en vez de al Postgres local de Docker:
    declarar `N8N_RESTRICT_FILE_ACCESS_TO` en su `docker-compose.yml` — sin
    esa variable, `reportar-incidencia-laboratorio` falla al intentar
    guardar la foto (ver "Fotos de incidencias" arriba).
+7. **Reemplazar la URL de verificación del QR del certificado** (el QR
+   funciona como firma de Secretaría — ver `workflow-verificar-certificado.json`
+   y la página pública `/verificar-certificado` en la app). Hoy apunta a
+   `http://localhost:4200/verificar-certificado/{codigo}` (2 ocurrencias, en
+   los nodos "Formatear Respuesta" y "Formatear Respuesta Existente" de
+   `workflow-generar-certificado.json`) — reemplazar por el dominio real del
+   VPS antes de producción, o los certificados ya emitidos en desarrollo
+   quedarían con un QR roto. `environment.prod.ts` (n8nBaseUrl) también debe
+   apuntar al dominio real, no a `localhost`.
 
 ---
 

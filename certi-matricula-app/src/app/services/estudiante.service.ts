@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Observable, of, throwError } from 'rxjs';
-import { delay, map } from 'rxjs/operators';
+import { catchError, delay, map } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
 import {
   CertificadoMatricula,
@@ -12,7 +12,8 @@ import {
   Laboratorio,
   ResultadoReseteoCorreo,
   TicketSolicitud,
-  Usuario
+  Usuario,
+  VerificacionCertificado
 } from '../models/estudiante.model';
 
 /**
@@ -217,11 +218,11 @@ export class EstudianteService {
           month: 'long',
           day: '2-digit'
         }),
-        // En producción esta URL la arma el backend y apunta al sistema web
-        // de verificación de certificados que construyen tus compañeros.
+        // En producción esta URL la arma el backend (workflow-generar-certificado)
+        // y apunta a la página pública /verificar-certificado de esta misma app.
         urlVerificacion: ''
       };
-      certificado.urlVerificacion = `https://verificacion.tudominio.edu.ec/certificados/${certificado.codigoUnico}`;
+      certificado.urlVerificacion = `${window.location.origin}/verificar-certificado/${certificado.codigoUnico}`;
       this.certificadosEmitidosMock.set(claveCertificado, certificado);
       this.registrarTicket(cedula, {
         id: certificado.codigoUnico,
@@ -258,6 +259,30 @@ export class EstudianteService {
         pdfBase64
       })
       .pipe(map(() => undefined));
+  }
+
+  /**
+   * Equivale al webhook público de n8n que valida el QR impreso en el
+   * certificado (el QR funciona como firma de Secretaría — esta es la
+   * verificación detrás de esa firma). No requiere sesión ni OTP: la llama
+   * la página pública /verificar-certificado, a la que apunta el QR.
+   * Webhook real esperado: POST {n8nBaseUrl}/verificar-certificado  body: { codigo }
+   */
+  verificarCertificado(codigo: string): Observable<VerificacionCertificado> {
+    if (environment.usarMock) {
+      return of({ autentico: false, error: 'Verificación no disponible en modo mock.' }).pipe(delay(700));
+    }
+
+    return this.http
+      .post<VerificacionCertificado>(`${environment.n8nBaseUrl}/verificar-certificado`, { codigo })
+      .pipe(
+        catchError((err: HttpErrorResponse) => {
+          if (err.error && typeof err.error === 'object' && 'autentico' in err.error) {
+            return of(err.error as VerificacionCertificado);
+          }
+          return of({ autentico: false, error: 'No se pudo verificar el certificado en este momento.' });
+        })
+      );
   }
 
   /**

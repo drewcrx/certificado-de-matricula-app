@@ -1,0 +1,86 @@
+.verificar-content {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
+
+// Colores fijos (no ligados a variables de tema --ion-color-*): la tarjeta
+// es deliberadamente clara para que se vea como un documento/certificado,
+// así que el texto debe quedar oscuro SIEMPRE, sin importar si el celular
+// del usuario tiene el modo oscuro activado (si no, el texto hereda blanco
+// del tema del sistema y queda invisible sobre el fondo claro).
+.tarjeta-estado {
+  max-width: 480px;
+  width: 100%;
+  margin: 24px auto;
+  background: #f5f6fa;
+  color: #1a1a2e;
+  border-radius: 16px;
+  padding: 28px 24px;
+  text-align: center;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+
+  ion-spinner {
+    width: 48px;
+    height: 48px;
+  }
+
+  .icono-estado {
+    font-size: 56px;
+    margin-bottom: 8px;
+  }
+
+  h2 {
+    margin: 8px 0 4px;
+    font-size: 20px;
+    color: #1a1a2e;
+  }
+
+  .subtitulo {
+    color: #4a4a5a;
+    font-size: 14px;
+    margin-bottom: 16px;
+  }
+
+  &.tarjeta-ok .icono-estado {
+    color: #2dd36f;
+  }
+
+  &.tarjeta-error .icono-estado {
+    color: #eb445a;
+  }
+}
+
+.detalle {
+  text-align: left;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  padding-top: 12px;
+  margin-top: 8px;
+
+  .fila {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 6px 0;
+    font-size: 14px;
+    color: #1a1a2e;
+
+    .etiqueta {
+      color: #6a6a7a;
+      flex: 0 0 auto;
+    }
+
+    .valor {
+      font-weight: 600;
+      text-align: right;
+      color: #1a1a2e;
+    }
+  }
+}
+
+.codigo {
+  margin-top: 16px;
+  font-size: 11px;
+  color: #7a7a8a;
+  word-break: break-all;
+}

@@ -85,3 +85,23 @@ export interface ResultadoReseteoCorreo {
   correoNotificado: string;
   mensaje: string;
 }
+
+/**
+ * Respuesta pública del webhook verificar-certificado (el QR del certificado
+ * funciona como firma de Secretaría — esta es la validación detrás de esa
+ * firma). No requiere sesión ni OTP: cualquiera que escanee el QR llega aquí.
+ */
+export interface VerificacionCertificado {
+  autentico: boolean;
+  error?: string;
+  codigoUnico?: string;
+  nombreCompleto?: string;
+  cedula?: string;
+  carrera?: string;
+  nivel?: string;
+  periodoActual?: string;
+  modalidad?: string;
+  fechaEmision?: string;
+  firmanteNombre?: string;
+  firmanteCargo?: string;
+}

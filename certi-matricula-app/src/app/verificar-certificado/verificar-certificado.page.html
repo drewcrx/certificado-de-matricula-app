@@ -1,0 +1,37 @@
+<ion-header [translucent]="true">
+  <ion-toolbar color="primary">
+    <ion-title>Verificación de Certificado</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding verificar-content">
+  <div class="tarjeta-estado" *ngIf="cargando">
+    <ion-spinner name="crescent"></ion-spinner>
+    <p>Verificando certificado…</p>
+  </div>
+
+  <div class="tarjeta-estado tarjeta-ok" *ngIf="!cargando && resultado?.autentico">
+    <ion-icon name="checkmark-circle" class="icono-estado"></ion-icon>
+    <h2>Certificado Auténtico</h2>
+    <p class="subtitulo">Este documento fue emitido oficialmente por el Instituto Superior Tecnológico de Turismo y Patrimonio "YAVIRAC".</p>
+
+    <div class="detalle">
+      <div class="fila"><span class="etiqueta">Estudiante</span><span class="valor">{{ resultado?.nombreCompleto }}</span></div>
+      <div class="fila"><span class="etiqueta">Cédula</span><span class="valor">{{ resultado?.cedula }}</span></div>
+      <div class="fila"><span class="etiqueta">Carrera</span><span class="valor">{{ resultado?.carrera }}</span></div>
+      <div class="fila"><span class="etiqueta">Nivel</span><span class="valor">{{ resultado?.nivel }}</span></div>
+      <div class="fila"><span class="etiqueta">Periodo</span><span class="valor">{{ resultado?.periodoActual }}</span></div>
+      <div class="fila"><span class="etiqueta">Modalidad</span><span class="valor">{{ resultado?.modalidad }}</span></div>
+      <div class="fila"><span class="etiqueta">Fecha de emisión</span><span class="valor">{{ resultado?.fechaEmision }}</span></div>
+      <div class="fila"><span class="etiqueta">Firmado por</span><span class="valor">{{ resultado?.firmanteNombre }}, {{ resultado?.firmanteCargo }}</span></div>
+    </div>
+
+    <p class="codigo">Código de verificación: <code>{{ resultado?.codigoUnico }}</code></p>
+  </div>
+
+  <div class="tarjeta-estado tarjeta-error" *ngIf="!cargando && !resultado?.autentico">
+    <ion-icon name="close-circle" class="icono-estado"></ion-icon>
+    <h2>Certificado No Válido</h2>
+    <p class="subtitulo">{{ resultado?.error || 'No se pudo verificar este certificado.' }}</p>
+  </div>
+</ion-content>
