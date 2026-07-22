@@ -188,14 +188,14 @@
       "parameters": {
         "fromEmail": "no-responder@yavirac.edu.ec",
         "toEmail": "={{ $('Generar Ticket').item.json.correoInstitucional }}",
-        "subject": "Tu ticket de verificación - YaviBot",
+        "subject": "Tu código de verificación - YaviBot",
         "emailFormat": "text",
-        "text": "={{ \"Hola \" + $('Generar Ticket').item.json.nombres + \",\\n\\nTu ticket de verificación es: \" + $('Generar Ticket').item.json.ticket + \"\\n\\nEste ticket expira en 10 minutos. Si no lo solicitaste, ignora este correo.\" }}"
+        "text": "=🏫 INSTITUTO SUPERIOR TECNOLÓGICO \"YAVIRAC\"\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nHola {{ $('Generar Ticket').item.json.nombres }},\n\nEste es tu código de verificación para continuar en YaviBot:\n\n   🔐  {{ $('Generar Ticket').item.json.ticket }}\n\nEste código expira en 10 minutos. Si tú no lo solicitaste, puedes ignorar este correo con confianza.\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n📱 Enviado desde la app móvil · YaviBot\nInstituto Superior Tecnológico \"YAVIRAC\" · Quito, Ecuador\nwww.yavirac.edu.ec"
       },
       "id": "c7777777-7777-4777-8777-777777777777",
       "name": "Enviar Correo (SMTP)",
       "type": "n8n-nodes-base.emailSend",
-      "typeVersion": 2.1,
+      "typeVersion": 2,
       "position": [
         1500,
         -120

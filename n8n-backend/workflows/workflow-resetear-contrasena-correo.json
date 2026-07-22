@@ -11,7 +11,10 @@
       "name": "Nota",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
-      "position": [-320, -320]
+      "position": [
+        -320,
+        -320
+      ]
     },
     {
       "parameters": {
@@ -25,7 +28,10 @@
       "name": "Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [200, 0],
+      "position": [
+        200,
+        0
+      ],
       "webhookId": "resetear-contrasena-correo",
       "credentials": {
         "httpHeaderAuth": {
@@ -45,7 +51,10 @@
       "name": "Webhook (OPTIONS)",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [200, 500],
+      "position": [
+        200,
+        500
+      ],
       "webhookId": "resetear-contrasena-correo-options"
     },
     {
@@ -56,9 +65,18 @@
           "responseCode": 204,
           "responseHeaders": {
             "entries": [
-              { "name": "Access-Control-Allow-Origin", "value": "*" },
-              { "name": "Access-Control-Allow-Methods", "value": "POST, OPTIONS" },
-              { "name": "Access-Control-Allow-Headers", "value": "Content-Type, X-Api-Key" }
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              },
+              {
+                "name": "Access-Control-Allow-Methods",
+                "value": "POST, OPTIONS"
+              },
+              {
+                "name": "Access-Control-Allow-Headers",
+                "value": "Content-Type, X-Api-Key"
+              }
             ]
           }
         }
@@ -67,7 +85,10 @@
       "name": "Responder: CORS preflight",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [460, 500]
+      "position": [
+        460,
+        500
+      ]
     },
     {
       "parameters": {
@@ -82,22 +103,35 @@
       "name": "Buscar Estudiante (Postgres)",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
-      "position": [460, 0],
+      "position": [
+        460,
+        0
+      ],
       "alwaysOutputData": true,
       "credentials": {
-        "postgres": { "id": "REEMPLAZAR", "name": "REEMPLAZAR con credenciales reales" }
+        "postgres": {
+          "id": "REEMPLAZAR",
+          "name": "REEMPLAZAR con credenciales reales"
+        }
       }
     },
     {
       "parameters": {
         "conditions": {
-          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
           "conditions": [
             {
               "id": "cond1",
               "leftValue": "={{ $json.estudiante_id }}",
               "rightValue": "",
-              "operator": { "type": "string", "operation": "notEmpty" }
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
             }
           ],
           "combinator": "and"
@@ -108,7 +142,10 @@
       "name": "¿Existe el estudiante?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [720, 0]
+      "position": [
+        720,
+        0
+      ]
     },
     {
       "parameters": {
@@ -123,22 +160,35 @@
       "name": "Verificar Sesión Validada (Postgres)",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
-      "position": [980, -180],
+      "position": [
+        980,
+        -180
+      ],
       "alwaysOutputData": true,
       "credentials": {
-        "postgres": { "id": "REEMPLAZAR", "name": "REEMPLAZAR con credenciales reales" }
+        "postgres": {
+          "id": "REEMPLAZAR",
+          "name": "REEMPLAZAR con credenciales reales"
+        }
       }
     },
     {
       "parameters": {
         "conditions": {
-          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
           "conditions": [
             {
               "id": "cond1",
               "leftValue": "={{ $json.ok }}",
               "rightValue": "",
-              "operator": { "type": "number", "operation": "notEmpty" }
+              "operator": {
+                "type": "number",
+                "operation": "notEmpty"
+              }
             }
           ],
           "combinator": "and"
@@ -149,7 +199,10 @@
       "name": "¿Tiene sesión válida?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [1240, -180]
+      "position": [
+        1240,
+        -180
+      ]
     },
     {
       "parameters": {
@@ -164,22 +217,35 @@
       "name": "Verificar Cooldown (Postgres)",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
-      "position": [1500, -180],
+      "position": [
+        1500,
+        -180
+      ],
       "alwaysOutputData": true,
       "credentials": {
-        "postgres": { "id": "REEMPLAZAR", "name": "REEMPLAZAR con credenciales reales" }
+        "postgres": {
+          "id": "REEMPLAZAR",
+          "name": "REEMPLAZAR con credenciales reales"
+        }
       }
     },
     {
       "parameters": {
         "conditions": {
-          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
           "conditions": [
             {
               "id": "cond1",
               "leftValue": "={{ $json.ok }}",
               "rightValue": "",
-              "operator": { "type": "number", "operation": "empty" }
+              "operator": {
+                "type": "number",
+                "operation": "empty"
+              }
             }
           ],
           "combinator": "and"
@@ -190,7 +256,10 @@
       "name": "¿Puede resetear ahora?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [1760, -180]
+      "position": [
+        1760,
+        -180
+      ]
     },
     {
       "parameters": {
@@ -200,7 +269,10 @@
       "name": "Generar Contraseña Temporal",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2020, -180]
+      "position": [
+        2020,
+        -180
+      ]
     },
     {
       "parameters": {
@@ -216,7 +288,10 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "onError": "continueRegularOutput",
-      "position": [2280, -180],
+      "position": [
+        2280,
+        -180
+      ],
       "notes": "REEMPLAZAR: credencial de Service Account de Google Cloud con Domain-Wide Delegation + scope https://www.googleapis.com/auth/admin.directory.user, impersonando a un admin real del dominio (subject de la delegación). Rol recomendado del lado de Google Workspace: uno personalizado con el privilegio mínimo 'Reset user passwords', NO Super Admin. onError=continueRegularOutput: si falla, cae a la rama de error 502 sin tumbar la ejecución.",
       "credentials": {
         "googleApi": {
@@ -228,13 +303,20 @@
     {
       "parameters": {
         "conditions": {
-          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
           "conditions": [
             {
               "id": "cond1",
               "leftValue": "={{ $json.error }}",
               "rightValue": "",
-              "operator": { "type": "string", "operation": "empty" }
+              "operator": {
+                "type": "string",
+                "operation": "empty"
+              }
             }
           ],
           "combinator": "and"
@@ -245,7 +327,10 @@
       "name": "¿Reseteo exitoso?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [2540, -180]
+      "position": [
+        2540,
+        -180
+      ]
     },
     {
       "parameters": {
@@ -255,7 +340,10 @@
       "name": "Preparar Auditoría",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2800, -280]
+      "position": [
+        2800,
+        -280
+      ]
     },
     {
       "parameters": {
@@ -270,9 +358,15 @@
       "name": "Registrar Auditoría (Postgres)",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
-      "position": [3060, -280],
+      "position": [
+        3060,
+        -280
+      ],
       "credentials": {
-        "postgres": { "id": "REEMPLAZAR", "name": "REEMPLAZAR con credenciales reales" }
+        "postgres": {
+          "id": "REEMPLAZAR",
+          "name": "REEMPLAZAR con credenciales reales"
+        }
       }
     },
     {
@@ -280,19 +374,25 @@
         "fromEmail": "no-reply@yavirac.edu.ec",
         "toEmail": "={{ $('Buscar Estudiante (Postgres)').item.json.correoInstitucional }}",
         "subject": "Tu contraseña de correo institucional fue reseteada",
-        "emailFormat": "html",
-        "message": "=<div style=\"font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;\">\n  <div style=\"text-align: center; margin-bottom: 24px;\">\n    <h2 style=\"color: #1a237e; margin-top: 12px;\">Instituto Superior Tecnológico<br>de Turismo y Patrimonio \"YAVIRAC\"</h2>\n  </div>\n\n  <p>Estimado/a {{ $('Buscar Estudiante (Postgres)').item.json.nombres }},</p>\n\n  <p>Tu contraseña de correo institucional fue reseteada exitosamente desde YaviBot. Esta es tu nueva contraseña temporal:</p>\n\n  <div style=\"background: #f5f5f5; border-left: 4px solid #1a237e; padding: 16px; margin: 20px 0; border-radius: 4px; text-align: center;\">\n    <code style=\"font-size: 18px; font-weight: bold;\">{{ $('Generar Contraseña Temporal').item.json.passwordTemporal }}</code>\n  </div>\n\n  <p>Se te pedirá cambiarla la próxima vez que inicies sesión. Si tú no solicitaste este reseteo, contacta de inmediato a Soporte Técnico.</p>\n\n  <hr style=\"border: none; border-top: 1px solid #ddd; margin: 24px 0;\" />\n\n  <p style=\"color: #666; font-size: 12px; text-align: center;\">\n    Este correo fue generado automáticamente por el sistema YaviBot.<br>\n    Instituto Superior Tecnológico de Turismo y Patrimonio \"YAVIRAC\" | www.yavirac.edu.ec\n  </p>\n</div>",
-        "options": {}
+        "emailFormat": "text",
+        "options": {},
+        "text": "=🏫 INSTITUTO SUPERIOR TECNOLÓGICO \"YAVIRAC\"\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n🔑 Contraseña reseteada\n\nEstimado/a {{ $('Buscar Estudiante (Postgres)').item.json.nombres }},\n\nTu contraseña de correo institucional fue reseteada exitosamente desde YaviBot. Esta es tu nueva contraseña temporal:\n\n   {{ $('Generar Contraseña Temporal').item.json.passwordTemporal }}\n\nSe te pedirá cambiarla la próxima vez que inicies sesión. Si tú no solicitaste este reseteo, contacta de inmediato a Soporte Técnico.\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n📱 Enviado desde la app móvil · YaviBot\nInstituto Superior Tecnológico \"YAVIRAC\" · Quito, Ecuador\nwww.yavirac.edu.ec"
       },
       "id": "ecccccc3-cccc-4ccc-8ccc-ccccccccccc3",
       "name": "Enviar Nueva Contraseña (Correo)",
       "type": "n8n-nodes-base.emailSend",
       "typeVersion": 2,
       "onError": "continueRegularOutput",
-      "position": [2800, -80],
+      "position": [
+        2800,
+        -80
+      ],
       "notes": "CONFIGURAR: credenciales SMTP. Este correo es la ÚNICA forma en que la contraseña nueva sale del sistema — nunca en la respuesta HTTP ni en logs/auditoría.",
       "credentials": {
-        "smtp": { "id": "REEMPLAZAR", "name": "REEMPLAZAR con credenciales SMTP (Mailtrap en pruebas)" }
+        "smtp": {
+          "id": "REEMPLAZAR",
+          "name": "REEMPLAZAR con credenciales SMTP (Mailtrap en pruebas)"
+        }
       }
     },
     {
@@ -302,7 +402,12 @@
         "options": {
           "responseCode": 200,
           "responseHeaders": {
-            "entries": [{ "name": "Access-Control-Allow-Origin", "value": "*" }]
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
           }
         }
       },
@@ -310,7 +415,10 @@
       "name": "Responder: Reseteo exitoso",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [3320, -180]
+      "position": [
+        3320,
+        -180
+      ]
     },
     {
       "parameters": {
@@ -318,14 +426,24 @@
         "responseBody": "={{ { \"error\": \"Estudiante no encontrado.\" } }}",
         "options": {
           "responseCode": 404,
-          "responseHeaders": { "entries": [{ "name": "Access-Control-Allow-Origin", "value": "*" }] }
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
         }
       },
       "id": "eddddddd-dddd-4ddd-8ddd-ddddddddddd1",
       "name": "Responder: No encontrado",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [980, 260]
+      "position": [
+        980,
+        260
+      ]
     },
     {
       "parameters": {
@@ -333,14 +451,24 @@
         "responseBody": "={{ { \"error\": \"Debes verificar tu identidad nuevamente antes de continuar.\" } }}",
         "options": {
           "responseCode": 403,
-          "responseHeaders": { "entries": [{ "name": "Access-Control-Allow-Origin", "value": "*" }] }
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
         }
       },
       "id": "eddddddd-dddd-4ddd-8ddd-ddddddddddd2",
       "name": "Responder: Sin sesión válida",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [1500, 160]
+      "position": [
+        1500,
+        160
+      ]
     },
     {
       "parameters": {
@@ -348,14 +476,24 @@
         "responseBody": "={{ { \"error\": \"Ya reseteaste tu contraseña recientemente. Intenta de nuevo en unos minutos.\" } }}",
         "options": {
           "responseCode": 429,
-          "responseHeaders": { "entries": [{ "name": "Access-Control-Allow-Origin", "value": "*" }] }
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
         }
       },
       "id": "eddddddd-dddd-4ddd-8ddd-ddddddddddd3",
       "name": "Responder: Cooldown activo",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [2020, 160]
+      "position": [
+        2020,
+        160
+      ]
     },
     {
       "parameters": {
@@ -363,71 +501,201 @@
         "responseBody": "={{ { \"error\": \"No se pudo completar el reseteo en este momento. Intenta más tarde.\" } }}",
         "options": {
           "responseCode": 502,
-          "responseHeaders": { "entries": [{ "name": "Access-Control-Allow-Origin", "value": "*" }] }
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
         }
       },
       "id": "eddddddd-dddd-4ddd-8ddd-ddddddddddd4",
       "name": "Responder: Proveedor falló",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [2800, 60]
+      "position": [
+        2800,
+        60
+      ]
     }
   ],
   "connections": {
     "Webhook": {
-      "main": [[{ "node": "Buscar Estudiante (Postgres)", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Buscar Estudiante (Postgres)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Webhook (OPTIONS)": {
-      "main": [[{ "node": "Responder: CORS preflight", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Responder: CORS preflight",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Buscar Estudiante (Postgres)": {
-      "main": [[{ "node": "¿Existe el estudiante?", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "¿Existe el estudiante?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "¿Existe el estudiante?": {
       "main": [
-        [{ "node": "Verificar Sesión Validada (Postgres)", "type": "main", "index": 0 }],
-        [{ "node": "Responder: No encontrado", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Verificar Sesión Validada (Postgres)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder: No encontrado",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Verificar Sesión Validada (Postgres)": {
-      "main": [[{ "node": "¿Tiene sesión válida?", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "¿Tiene sesión válida?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "¿Tiene sesión válida?": {
       "main": [
-        [{ "node": "Verificar Cooldown (Postgres)", "type": "main", "index": 0 }],
-        [{ "node": "Responder: Sin sesión válida", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Verificar Cooldown (Postgres)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder: Sin sesión válida",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Verificar Cooldown (Postgres)": {
-      "main": [[{ "node": "¿Puede resetear ahora?", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "¿Puede resetear ahora?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "¿Puede resetear ahora?": {
       "main": [
-        [{ "node": "Generar Contraseña Temporal", "type": "main", "index": 0 }],
-        [{ "node": "Responder: Cooldown activo", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Generar Contraseña Temporal",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder: Cooldown activo",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Generar Contraseña Temporal": {
-      "main": [[{ "node": "Resetear en Google Workspace (Admin SDK)", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Resetear en Google Workspace (Admin SDK)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Resetear en Google Workspace (Admin SDK)": {
-      "main": [[{ "node": "¿Reseteo exitoso?", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "¿Reseteo exitoso?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "¿Reseteo exitoso?": {
       "main": [
         [
-          { "node": "Preparar Auditoría", "type": "main", "index": 0 },
-          { "node": "Enviar Nueva Contraseña (Correo)", "type": "main", "index": 0 },
-          { "node": "Responder: Reseteo exitoso", "type": "main", "index": 0 }
+          {
+            "node": "Preparar Auditoría",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Enviar Nueva Contraseña (Correo)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Responder: Reseteo exitoso",
+            "type": "main",
+            "index": 0
+          }
         ],
-        [{ "node": "Responder: Proveedor falló", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Responder: Proveedor falló",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Preparar Auditoría": {
-      "main": [[{ "node": "Registrar Auditoría (Postgres)", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Registrar Auditoría (Postgres)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "pinData": {},
-  "settings": { "executionOrder": "v1" },
+  "settings": {
+    "executionOrder": "v1"
+  },
   "active": true
 }

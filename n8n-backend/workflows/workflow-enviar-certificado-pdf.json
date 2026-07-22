@@ -165,16 +165,16 @@
         "fromEmail": "no-reply@yavirac.edu.ec",
         "toEmail": "={{ $json.correoInstitucional }}",
         "subject": "=Tu Certificado de Matrícula YAVIRAC — {{ $json.periodoActual }}",
-        "emailFormat": "html",
-        "message": "=<div style=\"font-family: 'Times New Roman', serif; max-width: 600px; margin: 0 auto; padding: 20px;\">\n  <div style=\"text-align: center; margin-bottom: 24px;\">\n    <h2 style=\"color: #1a237e; margin-top: 12px;\">Instituto Superior Tecnológico<br>de Turismo y Patrimonio \"YAVIRAC\"</h2>\n  </div>\n\n  <p>Estimado/a <strong>{{ $json.nombreCompleto }}</strong>,</p>\n\n  <p>Adjunto encontrarás tu <strong>Certificado de Matrícula</strong> correspondiente al periodo lectivo <strong>{{ $json.periodoActual }}</strong>, en formato PDF con el membrete oficial del instituto.</p>\n\n  <p>El código QR incluido en el documento es único e irrepetible, y permite verificar la autenticidad de este certificado en el sistema institucional.</p>\n\n  <hr style=\"border: none; border-top: 1px solid #ddd; margin: 24px 0;\" />\n\n  <p style=\"color: #666; font-size: 12px; text-align: center;\">\n    Este correo fue generado automáticamente por el sistema YaviBot.<br>\n    Instituto Superior Tecnológico de Turismo y Patrimonio \"YAVIRAC\" | www.yavirac.edu.ec\n  </p>\n</div>",
+        "emailFormat": "text",
         "options": {
           "fileAttachments": "certificado"
-        }
+        },
+        "text": "=🏫 INSTITUTO SUPERIOR TECNOLÓGICO \"YAVIRAC\"\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n🎓 Tu Certificado de Matrícula\n\nEstimado/a {{ $json.nombreCompleto }},\n\nAdjunto encontrarás tu Certificado de Matrícula correspondiente al periodo lectivo {{ $json.periodoActual }}, en formato PDF con el membrete oficial del instituto.\n\nEl código QR incluido en el documento es único e irrepetible, y permite verificar la autenticidad de este certificado en el sistema institucional.\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n📱 Enviado desde la app móvil · YaviBot\nInstituto Superior Tecnológico \"YAVIRAC\" · Quito, Ecuador\nwww.yavirac.edu.ec"
       },
       "id": "f7777777-7777-4777-8777-777777777777",
       "name": "Enviar PDF por Correo (SMTP)",
       "type": "n8n-nodes-base.emailSend",
-      "typeVersion": 2.1,
+      "typeVersion": 2,
       "position": [
         1240,
         -120
