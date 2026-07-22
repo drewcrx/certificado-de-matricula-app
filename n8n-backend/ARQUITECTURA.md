@@ -60,9 +60,14 @@ workflows/
   workflow-generar-certificado.json            # dominio: trámites/tickets (especializado, estudiante)
   workflow-enviar-certificado-pdf.json         # dominio: trámites/tickets (adjunto PDF por correo)
   workflow-resetear-contrasena-correo.json     # dominio: trámites (especializado, automático, estudiante)
+  workflow-detectar-respuesta-ticket.json      # dominio: trámites/tickets (sin webhook — Gmail Trigger)
   workflow-consultar-laboratorios.json         # dominio: rol Docente (catálogo)
   workflow-reportar-incidencia-laboratorio.json # dominio: rol Docente (incidencia + foto opcional)
 ```
+
+`workflow-detectar-respuesta-ticket.json` es el único que **no** tiene un
+nodo Webhook — lo dispara Gmail Trigger, no la app. Ver "Cierre automático
+de tickets" más abajo.
 
 Cada dominio se agrupa por prefijo de nombre. Cuando el proyecto crezca (más
 trámites, más integraciones), los workflows nuevos se agregan siguiendo el
@@ -227,6 +232,38 @@ está en `PROPUESTA-RESET-CORREO-AUTOMATICO.md` — resumen:
 
 ---
 
+## Cierre automático de tickets (respuesta de Gmail)
+
+Los tickets (hoy solo Anulación de Matrícula) nunca pasaban de
+`EN_PROCESO` a `COMPLETADO` — no existía ningún mecanismo real que
+disparara ese cambio. Diseño completo en
+`PROPUESTA-CIERRE-AUTOMATICO-TICKETS.md`; resumen:
+
+- El correo de aviso a Secretaría (`workflow-crear-ticket-solicitud.json`)
+  ahora sale de una casilla real monitoreada (`tramites@yavirac.edu.ec`,
+  **placeholder** — TI debe confirmar/crear la real), no de un
+  `no-reply@` que nadie lee, y el asunto lleva el código al frente:
+  `[TK-XXXXXX] ...`.
+- `workflow-detectar-respuesta-ticket.json`: **Gmail Trigger** (no
+  webhook) sobre esa casilla. Cuando Secretaría responde el correo
+  original, extrae `TK-XXXXXX` del asunto, valida que el remitente
+  comparte el rol del responsable asignado (mismo patrón que los avisos a
+  dos personas de Anulación/Certificados) y marca `tickets.estado =
+  'Resuelto'`.
+- **Cero cambios en la app**: `/consultar-tickets` ya traducía `Resuelto →
+  COMPLETADO` desde que se construyó ese endpoint — simplemente nunca
+  había nada que produjera ese estado. Verificado con una prueba real
+  (`TK-000007` pasó a `COMPLETADO` en la respuesta del endpoint tras
+  simular la actualización).
+- El polling del Gmail Trigger (cada minuto) **no es un cron que cambie
+  estados por tiempo** — solo actúa si encuentra un correo real; el
+  disparador sigue siendo el evento, no el reloj.
+- Pendiente: credencial de Gmail en n8n (OAuth2/Service Account con acceso
+  de lectura únicamente a `tramites@yavirac.edu.ec`) y confirmar que esa
+  casilla existe/recibe correo de verdad.
+
+---
+
 ## Rol Docente
 
 Segunda identidad de usuario, agregada sin tocar el flujo de identificación
@@ -316,7 +353,13 @@ incidente. Diseño:
    auditoría y aviso a los encargados de certificados (ver "Reseteo de
    contraseña: automático, no un ticket" arriba). Falta que TI del
    instituto entregue la credencial real de Google Workspace.
-7. **Pendiente**: sub-workflows reutilizables (`sub-validar-estudiante`),
+7. **Fase 7 (hecha, pendiente credencial real)**: cierre automático de
+   tickets vía respuesta de Gmail — `detectar-respuesta-ticket`, validado
+   con pruebas reales de SQL (marca `COMPLETADO`, idempotencia, remitente
+   no autorizado correctamente ignorado). Falta la credencial de Gmail y
+   confirmar la casilla real `tramites@yavirac.edu.ec` (ver "Cierre
+   automático de tickets" arriba).
+8. **Pendiente**: sub-workflows reutilizables (`sub-validar-estudiante`),
    error workflow global en n8n, rotar la `X-Api-Key` de desarrollo antes
    de producción, desplegar en el VPS institucional apuntando a la base de
    datos real (ver sección "Despliegue en producción" arriba).
@@ -332,5 +375,9 @@ incidente. Diseño:
 - `PROPUESTA-RESET-CORREO-AUTOMATICO.md` — propuesta (aún no implementada)
   para que el reseteo de contraseña de correo institucional sea 100%
   automático contra el proveedor real de identidad, sin ticket manual.
+- `PROPUESTA-CIERRE-AUTOMATICO-TICKETS.md` — propuesta (aún no
+  implementada) para que un ticket pase a `Resuelto` automáticamente
+  cuando Secretaría responda el correo de aviso desde Gmail, sin panel
+  administrativo ni intervención manual.
 - `workflows/` — los workflows de n8n, importables, que implementan el
   contrato.

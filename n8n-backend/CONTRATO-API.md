@@ -354,6 +354,31 @@ reales de la tabla `tickets` (`Pendiente`/`En Proceso` → `EN_PROCESO`,
 `200` con `[]` (no `null`, no error). `id` es el `codigo` real del ticket
 (`TK-XXXXXX`), no un formato inventado.
 
+**Cómo llega un ticket a `COMPLETADO`**: automáticamente, sin panel
+administrativo ni intervención manual — ver "Workflows internos" más abajo
+(`detectar-respuesta-ticket`). Este endpoint no cambió en nada para
+soportarlo: simplemente lee `tickets.estado` en el momento de la consulta,
+así que refleja el cambio apenas ocurre, sin ningún ajuste de código.
+
+---
+
+## Workflows internos (sin endpoint HTTP)
+
+No todos los workflows de n8n exponen un webhook — algunos se disparan por
+otro tipo de evento y no forman parte del "contrato" que llama la app
+directamente, pero sí modifican datos que la app luego lee.
+
+### `detectar-respuesta-ticket`
+
+Disparado por **Gmail Trigger** (no por la app) sobre la casilla
+`tramites@yavirac.edu.ec`: cuando Secretaría responde el correo de aviso de
+un ticket (identificado por `[TK-XXXXXX]` en el asunto, ver §6), y el
+remitente es un responsable autorizado para ese trámite, marca
+`tickets.estado = 'Resuelto'` y registra el evento `TicketResuelto`. Ver
+`PROPUESTA-CIERRE-AUTOMATICO-TICKETS.md` para el diseño completo. No
+requiere ningún cambio en la app — el efecto se ve la próxima vez que se
+llama a `/consultar-tickets` (endpoint 5).
+
 ---
 
 ## 6. Crear ticket de solicitud (Anulación de Matrícula)
