@@ -198,6 +198,19 @@ Reglas importantes para el backend:
 `valido: false` si el ticket no coincide o ya expiró. La app solo muestra el
 menú de opciones cuando este endpoint responde `valido: true`.
 
+### Response — 429 (demasiados intentos fallidos)
+
+```json
+{ "error": "Demasiados intentos fallidos. Solicita un nuevo código e intenta de nuevo." }
+```
+
+**Límite de intentos:** el ticket es un código de 6 dígitos (1 millón de
+combinaciones posibles) y expira en 10 min — sin límite de intentos,
+alguien con la cédula de un estudiante podía intentar adivinarlo por fuerza
+bruta dentro de esa ventana. El workflow ahora registra cada intento
+fallido como evento `TicketVerificacionFallida` y bloquea con 429 al quinto
+intento fallido en 10 minutos para esa cédula.
+
 ---
 
 ## 4. Generar certificado de matrícula

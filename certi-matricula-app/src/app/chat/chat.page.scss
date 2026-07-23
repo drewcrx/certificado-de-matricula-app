@@ -40,6 +40,44 @@
   }
 }
 
+// ── Banner persistente de "sin conexión" (debajo del header, siempre
+// visible mientras dure — no solo un aviso puntual al intentar algo). Mismo
+// lenguaje "tarjeta con franja superior" que .tarjeta-recaptcha, en tono de
+// alerta (igual gradiente que .franja-alerta) ──────────────────────────────
+.banner-sin-conexion {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 10px 10px 0;
+  padding: 10px 14px;
+  background: #ffffff;
+  color: #c4460a;
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  border: 1px solid #ffd9ad;
+  border-radius: 14px;
+  box-shadow: 0 4px 18px rgba(230, 81, 0, 0.12);
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, var(--ion-color-danger), var(--ion-color-secondary));
+  }
+
+  ion-icon {
+    font-size: 17px;
+    flex-shrink: 0;
+  }
+}
+
 .chat-content {
   --background: var(--ion-color-light);
 }
@@ -513,26 +551,6 @@
   margin: 0 16px 8px;
 }
 
-// Aviso de correo enviado dentro de la tarjeta del certificado
-.aviso-correo {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 12px;
-  padding: 10px 12px;
-  background: #e8f5e9;
-  border-radius: 8px;
-  border-left: 4px solid #4caf50;
-  color: #2e7d32;
-  font-size: 13px;
-
-  ion-icon {
-    font-size: 18px;
-    flex-shrink: 0;
-  }
-}
-
-
 // ── Tarjetas de confirmación (Anulación, Reseteo, Incidencia) — mismo
 // lenguaje visual premium que la tarjeta del certificado ──────────────────
 .tarjeta-anulacion {
@@ -626,6 +644,30 @@
   font-weight: 600;
   font-size: 13px;
   text-transform: none;
+}
+
+// ── Botón "Reenviar código" (pantalla de espera del ticket OTP) — mismo
+// lenguaje "pastilla" que .boton-volver-menu ───────────────────────────────
+.boton-reenviar-ticket {
+  --color: var(--ion-color-primary);
+  --background: #eef1fa;
+  --background-activated: #e2e7f5;
+  --background-hover: #e2e7f5;
+  --border-radius: 12px;
+  --padding-start: 12px;
+  --padding-end: 14px;
+  font-weight: 600;
+  font-size: 12.5px;
+  text-transform: none;
+  height: 30px;
+  margin: 6px auto 4px;
+  display: block;
+  width: fit-content;
+
+  &[disabled] {
+    --color: #b6bccb;
+    --background: #f2f3f7;
+  }
 }
 
 // ── Botón "Volver al menú" ──────────────────────────────────────────────────

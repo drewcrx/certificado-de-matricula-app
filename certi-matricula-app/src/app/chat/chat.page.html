@@ -12,6 +12,10 @@
       </div>
     </ion-title>
   </ion-toolbar>
+  <div class="banner-sin-conexion" *ngIf="sinConexion">
+    <ion-icon name="cloud-offline-outline"></ion-icon>
+    <span>Sin conexión a internet</span>
+  </div>
 </ion-header>
 
 <ion-content class="chat-content">
@@ -108,10 +112,6 @@
               <img [src]="m.qrDataUrl" alt="Código QR único del certificado" />
             </div>
             <span class="codigo-qr">{{ m.certificado?.codigoUnico }}</span>
-          </div>
-          <div class="aviso-correo">
-            <ion-icon name="mail-outline"></ion-icon>
-            <span>El certificado ha sido enviado a tu correo institucional.</span>
           </div>
         </div>
       </div>
@@ -325,6 +325,14 @@
       </ion-button>
     </ion-item>
     <p class="error-cedula" *ngIf="errorTicket">{{ errorTicket }}</p>
+    <ion-button
+      size="small"
+      class="boton-reenviar-ticket"
+      [disabled]="reenviandoTicket || estado === 'validando_ticket'"
+      (click)="reenviarTicket()">
+      <ion-icon slot="start" name="refresh-outline"></ion-icon>
+      Reenviar código
+    </ion-button>
   </ion-toolbar>
 
   <ion-toolbar *ngIf="estado === 'menu' || estado === 'preview_certificado' || estado === 'seleccionando_laboratorio'">

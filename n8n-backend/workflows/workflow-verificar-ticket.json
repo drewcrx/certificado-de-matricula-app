@@ -94,9 +94,92 @@
       "parameters": {
         "operation": "executeQuery",
         "resource": "database",
+        "query": "SELECT COUNT(*) AS intentos FROM eventos WHERE tipo = 'TicketVerificacionFallida' AND payload->>'cedula' = $1 AND creado_en > NOW() - INTERVAL '10 minutes'",
+        "options": {
+          "queryReplacement": "={{ [ $json.body.cedula ] }}"
+        }
+      },
+      "id": "dbrute01-brut-4rut-8rut-brute0000001",
+      "name": "Verificar Intentos Fallidos (Postgres)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        460,
+        160
+      ],
+      "alwaysOutputData": true,
+      "notes": "El ticket es un código de 6 dígitos (1 millón de combinaciones) y este endpoint no tenía ningún límite de intentos — se podía intentar adivinarlo por fuerza bruta dentro de su ventana de 10 min. Máximo 5 intentos fallidos por cédula cada 10 min.",
+      "credentials": {
+        "postgres": {
+          "id": "REEMPLAZAR",
+          "name": "REEMPLAZAR con credenciales reales"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "cond1",
+              "leftValue": "={{ $json.intentos }}",
+              "rightValue": 5,
+              "operator": {
+                "type": "number",
+                "operation": "lt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "dbrute02-brut-4rut-8rut-brute0000002",
+      "name": "¿Bajo el límite de intentos?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        720,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"error\": \"Demasiados intentos fallidos. Solicita un nuevo código e intenta de nuevo.\" } }}",
+        "options": {
+          "responseCode": 429,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "dbrute03-brut-4rut-8rut-brute0000003",
+      "name": "Responder: Demasiados intentos",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        980,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "resource": "database",
         "query": "SELECT id FROM otp_codigos WHERE cedula = $1 AND codigo_hash = encode(digest($2, 'sha256'), 'hex') AND usado = FALSE AND expira_en > NOW() AND canal = 'chatbot' ORDER BY creado_en DESC LIMIT 1",
         "options": {
-          "queryReplacement": "={{ [$json.body.cedula, $json.body.ticket] }}"
+          "queryReplacement": "={{ [$('Webhook').item.json.body.cedula, $('Webhook').item.json.body.ticket] }}"
         }
       },
       "id": "d3333333-3333-4333-8333-333333333333",
@@ -104,7 +187,7 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        460,
+        980,
         0
       ],
       "alwaysOutputData": true,
@@ -217,9 +300,33 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [
-        980,
+        1500,
         140
       ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "resource": "database",
+        "query": "INSERT INTO eventos (tipo, payload, origen) VALUES ('TicketVerificacionFallida', $1::jsonb, 'chatbot')",
+        "options": {
+          "queryReplacement": "={{ [ JSON.stringify({ cedula: $('Webhook').item.json.body.cedula }) ] }}"
+        }
+      },
+      "id": "dbrute04-brut-4rut-8rut-brute0000004",
+      "name": "Registrar Intento Fallido (Postgres)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1240,
+        140
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "REEMPLAZAR",
+          "name": "REEMPLAZAR con credenciales reales"
+        }
+      }
     }
   ],
   "connections": {
@@ -227,7 +334,36 @@
       "main": [
         [
           {
+            "node": "Verificar Intentos Fallidos (Postgres)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verificar Intentos Fallidos (Postgres)": {
+      "main": [
+        [
+          {
+            "node": "¿Bajo el límite de intentos?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Bajo el límite de intentos?": {
+      "main": [
+        [
+          {
             "node": "Buscar Ticket Vigente (Postgres)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder: Demasiados intentos",
             "type": "main",
             "index": 0
           }
@@ -265,6 +401,17 @@
             "index": 0
           }
         ],
+        [
+          {
+            "node": "Registrar Intento Fallido (Postgres)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Registrar Intento Fallido (Postgres)": {
+      "main": [
         [
           {
             "node": "Responder: Inválido",

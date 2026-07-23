@@ -1,8 +1,9 @@
-import { Component, NgZone, OnInit, ViewChild } from '@angular/core';
+import { Component, NgZone, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
 import { IonContent } from '@ionic/angular';
 import * as QRCode from 'qrcode';
 import { firstValueFrom } from 'rxjs';
+import { PluginListenerHandle } from '@capacitor/core';
 import { Network } from '@capacitor/network';
 import { EstudianteService } from '../services/estudiante.service';
 import { CertificadoPdfService } from '../services/certificado-pdf.service';
@@ -100,10 +101,12 @@ const OPCIONES_MENU_DOCENTE: OpcionChat[] = [
   styleUrls: ['./chat.page.scss'],
   standalone: false,
 })
-export class ChatPage implements OnInit {
+export class ChatPage implements OnInit, OnDestroy {
   @ViewChild(IonContent) contenido!: IonContent;
 
   mensajes: ChatMensaje[] = [];
+  sinConexion = false;
+  private listenerRed: PluginListenerHandle | null = null;
 
   estado: EstadoConversacion = 'esperando_cedula';
   cedulaIngresada = '';
@@ -111,6 +114,7 @@ export class ChatPage implements OnInit {
 
   ticketIngresado = '';
   errorTicket = '';
+  reenviandoTicket = false;
 
   captchaToken: string | null = null;
   private recaptchaWidgetId: number | null = null;
@@ -132,6 +136,26 @@ export class ChatPage implements OnInit {
   ngOnInit(): void {
     this.iniciarConversacion();
     this.renderCaptcha();
+    this.iniciarMonitorDeRed();
+  }
+
+  ngOnDestroy(): void {
+    this.listenerRed?.remove();
+  }
+
+  /**
+   * Banner persistente (no solo un aviso puntual al intentar una acción):
+   * apenas el dispositivo pierde conexión, `sinConexion` se activa de
+   * inmediato vía el listener de Capacitor, sin esperar a que el usuario
+   * intente algo primero. Corre fuera de la zona de Angular, por eso el
+   * `ngZone.run` (mismo patrón que los callbacks de reCAPTCHA).
+   */
+  private async iniciarMonitorDeRed(): Promise<void> {
+    const estadoInicial = await Network.getStatus();
+    this.sinConexion = !estadoInicial.connected;
+    this.listenerRed = await Network.addListener('networkStatusChange', estado => {
+      this.ngZone.run(() => { this.sinConexion = !estado.connected; });
+    });
   }
 
   /**
@@ -303,10 +327,56 @@ export class ChatPage implements OnInit {
         this.agregarMensaje({ tipo: 'bot-opciones' });
         this.estado = 'menu';
       },
-      error: async () => {
+      error: async (error: HttpErrorResponse) => {
         this.quitarEscribiendo();
+        if (error.status === 429) {
+          await this.hablar('Hiciste demasiados intentos con ese código. Por seguridad, vamos a solicitar uno nuevo.');
+          await this.iniciarConversacion();
+          return;
+        }
         await this.hablar('Tuve un problema verificando el ticket. Intenta nuevamente en unos segundos.');
         this.estado = 'esperando_ticket';
+      }
+    });
+  }
+
+  /**
+   * Pide un nuevo ticket sin reiniciar toda la conversación (a diferencia de
+   * `enviarTicketDeVerificacion`, un fallo aquí NO debe devolver al usuario a
+   * la pantalla de cédula — ya está identificado, solo necesita un código
+   * nuevo). El cooldown de 60s lo aplica el backend (429); este método solo
+   * evita que se pueda disparar dos veces mientras la primera sigue en vuelo.
+   */
+  async reenviarTicket(): Promise<void> {
+    if (this.estado !== 'esperando_ticket' || !this.usuarioActual || this.reenviandoTicket) {
+      return;
+    }
+    const usuario = this.usuarioActual;
+    this.agregarMensaje({ tipo: 'usuario-texto', texto: 'Reenviar código' });
+
+    if (!(await this.requiereConexion())) {
+      return;
+    }
+
+    this.reenviandoTicket = true;
+    this.mostrarEscribiendo();
+    this.estudianteService.enviarTicketVerificacion(usuario.cedula).subscribe({
+      next: async resultado => {
+        this.quitarEscribiendo();
+        this.reenviandoTicket = false;
+        await this.hablar(`Te reenviamos un nuevo código a tu correo institucional (${resultado.correoEnmascarado}).`);
+        if (resultado.ticketDebugSoloMock) {
+          await this.hablar(`🔧 Modo prueba: tu ticket es ${resultado.ticketDebugSoloMock}.`);
+        }
+      },
+      error: async (error: HttpErrorResponse) => {
+        this.quitarEscribiendo();
+        this.reenviandoTicket = false;
+        if (error.status === 429) {
+          await this.hablar('Ya te enviamos un código hace unos segundos. Espera un momento antes de pedir otro.');
+        } else {
+          await this.hablar('No pude reenviar el código en este momento. Intenta nuevamente en unos segundos.');
+        }
       }
     });
   }
