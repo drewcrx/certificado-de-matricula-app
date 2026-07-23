@@ -12,9 +12,9 @@ PostgreSQL (a partir de 2026-07-20 ya no es un esquema temporal — es el dump
 real compartido por el usuario).
 
 Base URL para pruebas locales: `http://localhost:5678/webhook` (ya
-configurada en `environment.ts`). Los 7 workflows manejan además el
-preflight CORS (`OPTIONS`) — sin eso, el navegador nunca llega a mandar el
-POST real y la app se queda sin respuesta.
+configurada en `environment.ts`). Los workflows con webhook manejan además
+el preflight CORS (`OPTIONS`) — sin eso, el navegador nunca llega a mandar
+el POST real y la app se queda sin respuesta.
 
 **Autenticación (header obligatorio):** todos los webhooks POST requieren el
 header `X-Api-Key` con el valor configurado en `environment.apiKey` (la app
@@ -385,6 +385,75 @@ Reglas importantes:
 
 ---
 
+## 4.2 Verificar certificado por QR (público)
+
+El QR impreso en el certificado (generado por `certificado-pdf.service.ts`)
+codifica una URL pública de la propia app:
+`{dominio}/verificar-certificado/{codigoUnico}`. Esa página Angular
+(`verificar-certificado.page.ts`, sin login ni OTP) llama a este endpoint
+para confirmar la autenticidad y mostrar los datos — es, en la práctica, el
+QR funcionando como firma digital de Secretaría.
+
+**POST** `/verificar-certificado`
+
+### Request
+
+```json
+{
+  "codigo": "744c7cb9-ab6f-46ce-9440-3d1da1c54798"
+}
+```
+
+### Response — 200 OK (certificado auténtico)
+
+```json
+{
+  "autentico": true,
+  "codigoUnico": "744c7cb9-ab6f-46ce-9440-3d1da1c54798",
+  "nombreCompleto": "CARRERA ANDREW",
+  "cedula": "175****314",
+  "carrera": "Desarrollo de Software",
+  "nivel": "Quinto",
+  "periodoActual": "mayo-septiembre 2026",
+  "modalidad": "DUAL",
+  "fechaEmision": "22 de julio de 2026",
+  "firmanteNombre": "Mtr. Alexandra Gordon M.",
+  "firmanteCargo": "Secretaria General (s)"
+}
+```
+
+### Response — 404 (código inexistente o inválido)
+
+```json
+{
+  "autentico": false,
+  "error": "No se encontró ningún certificado con ese código. Verifica el enlace o el código QR."
+}
+```
+
+Reglas importantes:
+
+- **Público a propósito**: cualquiera que escanee el QR debe poder verificar
+  sin identificarse — por eso NO exige sesión OTP (a diferencia de los demás
+  endpoints que actúan sobre un estudiante específico). La única protección
+  es la `X-Api-Key` (que agrega la propia página Angular automáticamente),
+  igual que el resto de la app.
+- **`cedula` viaja enmascarada** (`175****314`) — es la única cédula visible
+  sin autenticación en todo el sistema, así que nunca se muestra completa.
+- **`nivel`, `carrera`, `modalidad` y `periodoActual` se leen EN VIVO** de
+  `estudiantes`/`periodos_academicos` en el momento de la verificación, no
+  de una copia congelada en `certificados` — si el estudiante avanza de
+  nivel, el QR sigue mostrando su situación actual. Solo `fechaEmision` y
+  `firmanteNombre`/`firmanteCargo` quedan congelados (son hechos propios de
+  ESE certificado: cuándo se emitió y quién lo firmó).
+- Cada verificación exitosa incrementa `qr_codigos.verificaciones` — un
+  contador de cuántas veces se validó ese certificado.
+- Un código inexistente o mal formado **siempre responde 404**, nunca un
+  500 — así una URL manipulada se detecta con claridad en vez de mostrar un
+  error genérico.
+
+---
+
 ## 5. Consultar estado de mis tickets
 
 Alimenta la pantalla "Consultar estado de mis tickets" del menú. Devuelve el
@@ -627,21 +696,26 @@ se relacionan.
 Contiene workflows de n8n listos para **importar** (`Import from File` en
 n8n) como punto de partida:
 
-- `workflow-consultar-estudiante.json`
-- `workflow-enviar-ticket-verificacion.json`
-- `workflow-verificar-ticket.json`
-- `workflow-generar-certificado.json`
-- `workflow-enviar-certificado-pdf.json`
-- `workflow-consultar-tickets.json`
-- `workflow-crear-ticket-solicitud.json`
-- `workflow-consultar-laboratorios.json`
-- `workflow-reportar-incidencia-laboratorio.json`
+- `workflow-consultar-estudiante.json` — endpoint 1 (identidad + CAPTCHA)
+- `workflow-enviar-ticket-verificacion.json` — endpoint 2 (envío de OTP + cooldown)
+- `workflow-verificar-ticket.json` — endpoint 3 (verificación de OTP + límite de intentos)
+- `workflow-generar-certificado.json` — endpoint 4
+- `workflow-enviar-certificado-pdf.json` — endpoint 4.1
+- `workflow-verificar-certificado.json` — endpoint 4.2 (público, sin login — el QR)
+- `workflow-consultar-tickets.json` — endpoint 5
+- `workflow-crear-ticket-solicitud.json` — endpoint 6
+- `workflow-resetear-contrasena-correo.json` — endpoint 6.1
+- `workflow-consultar-laboratorios.json` — endpoint 8
+- `workflow-reportar-incidencia-laboratorio.json` — endpoint 9
+- `workflow-detectar-respuesta-ticket.json` — sin endpoint HTTP, disparado por Gmail Trigger (ver "Workflows internos" más arriba)
 
-Todos usan un nodo Postgres como ejemplo — si la base de datos es MySQL, SQL
-Server u otra, solo hay que reemplazar ese nodo por el equivalente y ajustar
-las credenciales y el nombre real de las tablas/columnas. El de enviar ticket
-usa un nodo de envío de correo genérico (`Send Email` / SMTP) que también hay
-que configurar con las credenciales reales del correo institucional.
+Los 12 están escritos contra el **esquema real** de PostgreSQL (`ESQUEMA-BD.md`),
+no contra uno genérico — si la base de datos real termina siendo distinta a
+la de esta instancia (otro motor, otros nombres de columna), hay que ajustar
+las queries de cada nodo Postgres, pero el contrato de request/response hacia
+la app no cambia. El de enviar/reenviar ticket y los de aviso por correo usan
+un nodo de envío de correo genérico (`Send Email` / SMTP) que también hay que
+configurar con las credenciales reales del correo institucional.
 
 ---
 
