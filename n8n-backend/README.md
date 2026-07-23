@@ -18,7 +18,7 @@ y el checklist de despliegue. Este README es solo el índice de archivos.
   trámites automáticos vs. manuales, checklist de despliegue en producción.
 - **`ESQUEMA-BD.md`** — esquema **real** de PostgreSQL (dump compartido por
   el instituto, no uno temporal/inventado).
-- **`CONTRATO-API.md`** — especificación completa de los 9 endpoints HTTP
+- **`CONTRATO-API.md`** — especificación completa de los 11 endpoints HTTP
   (request/response exactos, reglas de negocio, respuestas de error).
 - **`workflows/`** — los 12 workflows de n8n importables:
 

@@ -102,8 +102,10 @@ envelope `{success, data}`) por consistencia con lo ya construido:
 
 ## Seguridad
 
-- **Autenticación del webhook — ✅ implementado.** Los 10 workflows con
-  Webhook usan Header Auth (`X-Api-Key`) como credencial del propio nodo
+- **Autenticación del webhook — ✅ implementado.** Los 11 workflows con
+  Webhook (todos menos `workflow-detectar-respuesta-ticket.json`, que se
+  dispara por Gmail Trigger) usan Header Auth (`X-Api-Key`) como credencial
+  del propio nodo
   Webhook — sin el header correcto, n8n responde 403 antes de ejecutar
   cualquier lógica. La app la agrega automáticamente vía
   `ApiKeyInterceptor` (`certi-matricula-app/src/app/interceptors/`), que
@@ -385,10 +387,9 @@ incidente. Diseño:
    (`yavibot_dump.sql`, ver `ESQUEMA-BD.md`) — se migraron todas las
    queries de los nodos Postgres sin tocar el contrato ni la app.
 4. **Fase 4 (hecha)**: autenticación de webhooks (`X-Api-Key` vía Header
-   Auth en los 7 workflows + `ApiKeyInterceptor` en la app), certificado
-   en PDF por correo, idempotencia a nivel de base de datos (constraints
-   `UNIQUE`), notificación por correo al responsable de Anulación de
-   Matrícula.
+   Auth + `ApiKeyInterceptor` en la app), certificado en PDF por correo,
+   idempotencia a nivel de base de datos (constraints `UNIQUE`),
+   notificación por correo al responsable de Anulación de Matrícula.
 5. **Fase 5 (hecha)**: rol Docente — identificación compartida,
    `consultar-laboratorios`, `reportar-incidencia-laboratorio` con foto
    opcional (ver secciones "Rol Docente" y "Fotos de incidencias" arriba).
@@ -404,10 +405,19 @@ incidente. Diseño:
    no autorizado correctamente ignorado). Falta la credencial de Gmail y
    confirmar la casilla real `tramites@yavirac.edu.ec` (ver "Cierre
    automático de tickets" arriba).
-8. **Pendiente**: sub-workflows reutilizables (`sub-validar-estudiante`),
+8. **Fase 8 (hecha)**: verificación pública de certificado por QR
+   (`verificar-certificado` — el QR funciona como firma de Secretaría),
+   CAPTCHA en el ingreso de cédula, sesión OTP verificada server-side en
+   los 5 endpoints que actúan por un estudiante/docente específico, límite
+   de 5 intentos/10min al verificar el ticket, cooldown de 60s al
+   reenviarlo, y cédula enmascarada en la verificación pública — hasta
+   completar los 12 workflows y cerrar los hallazgos de la auditoría de
+   seguridad (ver sección "Seguridad" arriba).
+9. **Pendiente**: sub-workflows reutilizables (`sub-validar-estudiante`),
    error workflow global en n8n, rotar la `X-Api-Key` de desarrollo antes
-   de producción, desplegar en el VPS institucional apuntando a la base de
-   datos real (ver sección "Despliegue en producción" arriba).
+   de producción, rate-limiting por IP en el proxy del VPS, desplegar en
+   el VPS institucional apuntando a la base de datos real (ver secciones
+   "Seguridad" y "Despliegue en producción" arriba).
 
 ---
 

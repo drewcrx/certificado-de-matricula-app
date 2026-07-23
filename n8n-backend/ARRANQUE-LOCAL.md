@@ -82,7 +82,7 @@ Settings → Credentials → New → Header Auth
 
 Guarda con el nombre **"API Key App Certificado"**.
 
-### 2d. Importar los 7 workflows
+### 2d. Importar los 12 workflows
 
 > **Si ya tenías estos workflows importados de antes (versión vieja):**
 > bórralos primero (Workflows → abrir cada uno → menú ⋯ → Delete). Las
@@ -97,8 +97,13 @@ Workflows → Import from File → seleccionar uno a uno desde `workflows/`:
 3. `workflow-verificar-ticket.json`
 4. `workflow-generar-certificado.json`
 5. `workflow-enviar-certificado-pdf.json`
-6. `workflow-consultar-tickets.json`
-7. `workflow-crear-ticket-solicitud.json`
+6. `workflow-verificar-certificado.json` (público — la verificación por QR)
+7. `workflow-consultar-tickets.json`
+8. `workflow-crear-ticket-solicitud.json`
+9. `workflow-resetear-contrasena-correo.json`
+10. `workflow-consultar-laboratorios.json` (rol Docente)
+11. `workflow-reportar-incidencia-laboratorio.json` (rol Docente)
+12. `workflow-detectar-respuesta-ticket.json` (sin Webhook — ver nota abajo)
 
 En cada workflow:
 - Abrir el nodo **Webhook** (el POST, no el OPTIONS) → sección Credentials →
@@ -106,7 +111,18 @@ En cada workflow:
 - Abrir **cada nodo Postgres** → seleccionar credencial **"Yavirac DB"**
   (hay varios nodos Postgres por workflow, no solo el primero)
 - En los workflows de envío de correo, abrir el nodo **Send Email** → seleccionar **"SMTP Pruebas"**
+- En `workflow-consultar-estudiante.json`, el nodo "Verificar CAPTCHA (Google)"
+  ya trae la Secret Key real embebida — no necesita credencial de n8n.
 - Activar el workflow con el toggle superior derecho, y darle **Publicar**
+
+**`workflow-detectar-respuesta-ticket.json` es distinto**: no tiene nodo
+Webhook (lo dispara un **Gmail Trigger**, sondeando la casilla
+`tramites@yavirac.edu.ec`), así que no lleva la credencial de API Key ni
+Postgres en un nodo Webhook — en su lugar necesita una credencial Gmail
+OAuth2 en el nodo del trigger. Si todavía no tienes esa credencial, puedes
+dejarlo sin activar; el resto de la app funciona igual, solo que el cierre
+automático de tickets por respuesta de correo no corre hasta que la
+configures.
 
 ---
 
