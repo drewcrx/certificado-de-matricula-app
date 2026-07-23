@@ -252,7 +252,7 @@
         "options": {
           "fileAttachments": "certificado"
         },
-        "text": "=🏫 INSTITUTO SUPERIOR TECNOLÓGICO \"YAVIRAC\"\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n🎓 Tu Certificado de Matrícula\n\nEstimado/a {{ $json.nombreCompleto }},\n\nAdjunto encontrarás tu Certificado de Matrícula correspondiente al periodo lectivo {{ $json.periodoActual }}, en formato PDF con el membrete oficial del instituto.\n\nEl código QR incluido en el documento es único e irrepetible, y permite verificar la autenticidad de este certificado en el sistema institucional.\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n📱 Enviado desde la app móvil · YaviBot\nInstituto Superior Tecnológico \"YAVIRAC\" · Quito, Ecuador\nwww.yavirac.edu.ec"
+        "text": "=🏫 INSTITUTO SUPERIOR TECNOLÓGICO \"YAVIRAC\"\n\n🎓 Tu Certificado de Matrícula\n\nEstimado/a {{ $json.nombreCompleto }},\n\nAdjunto encontrarás tu Certificado de Matrícula correspondiente al periodo lectivo {{ $json.periodoActual }}, en formato PDF con el membrete oficial del instituto.\n\nEl código QR incluido en el documento es único e irrepetible, y permite verificar la autenticidad de este certificado en el sistema institucional.\n\n📱 Enviado desde la app móvil · YaviBot\nInstituto Superior Tecnológico \"YAVIRAC\" · Quito, Ecuador\nwww.yavirac.edu.ec"
       },
       "id": "f7777777-7777-4777-8777-777777777777",
       "name": "Enviar PDF por Correo (SMTP)",

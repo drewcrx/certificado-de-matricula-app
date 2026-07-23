@@ -376,7 +376,7 @@
         "subject": "Tu contraseña de correo institucional fue reseteada",
         "emailFormat": "text",
         "options": {},
-        "text": "=🏫 INSTITUTO SUPERIOR TECNOLÓGICO \"YAVIRAC\"\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n🔑 Contraseña reseteada\n\nEstimado/a {{ $('Buscar Estudiante (Postgres)').item.json.nombres }},\n\nTu contraseña de correo institucional fue reseteada exitosamente desde YaviBot. Esta es tu nueva contraseña temporal:\n\n   {{ $('Generar Contraseña Temporal').item.json.passwordTemporal }}\n\nSe te pedirá cambiarla la próxima vez que inicies sesión. Si tú no solicitaste este reseteo, contacta de inmediato a Soporte Técnico.\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n📱 Enviado desde la app móvil · YaviBot\nInstituto Superior Tecnológico \"YAVIRAC\" · Quito, Ecuador\nwww.yavirac.edu.ec"
+        "text": "=🏫 INSTITUTO SUPERIOR TECNOLÓGICO \"YAVIRAC\"\n\n🔑 Contraseña reseteada\n\nEstimado/a {{ $('Buscar Estudiante (Postgres)').item.json.nombres }},\n\nTu contraseña de correo institucional fue reseteada exitosamente desde YaviBot. Esta es tu nueva contraseña temporal:\n\n   {{ $('Generar Contraseña Temporal').item.json.passwordTemporal }}\n\nSe te pedirá cambiarla la próxima vez que inicies sesión. Si tú no solicitaste este reseteo, contacta de inmediato a Soporte Técnico.\n\n📱 Enviado desde la app móvil · YaviBot\nInstituto Superior Tecnológico \"YAVIRAC\" · Quito, Ecuador\nwww.yavirac.edu.ec"
       },
       "id": "ecccccc3-cccc-4ccc-8ccc-ccccccccccc3",
       "name": "Enviar Nueva Contraseña (Correo)",

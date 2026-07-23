@@ -273,7 +273,7 @@
         "toEmail": "={{ $('Generar Ticket').item.json.correoInstitucional }}",
         "subject": "Tu código de verificación - YaviBot",
         "emailFormat": "text",
-        "text": "=🏫 INSTITUTO SUPERIOR TECNOLÓGICO \"YAVIRAC\"\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nHola {{ $('Generar Ticket').item.json.nombres }},\n\nEste es tu código de verificación para continuar en YaviBot:\n\n   🔐  {{ $('Generar Ticket').item.json.ticket }}\n\nEste código expira en 10 minutos. Si tú no lo solicitaste, puedes ignorar este correo con confianza.\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n📱 Enviado desde la app móvil · YaviBot\nInstituto Superior Tecnológico \"YAVIRAC\" · Quito, Ecuador\nwww.yavirac.edu.ec"
+        "text": "=🏫 INSTITUTO SUPERIOR TECNOLÓGICO \"YAVIRAC\"\n\nHola {{ $('Generar Ticket').item.json.nombres }},\n\nEste es tu código de verificación para continuar en YaviBot:\n\n   🔐  {{ $('Generar Ticket').item.json.ticket }}\n\nEste código expira en 10 minutos. Si tú no lo solicitaste, puedes ignorar este correo con confianza.\n\n📱 Enviado desde la app móvil · YaviBot\nInstituto Superior Tecnológico \"YAVIRAC\" · Quito, Ecuador\nwww.yavirac.edu.ec"
       },
       "id": "c7777777-7777-4777-8777-777777777777",
       "name": "Enviar Correo (SMTP)",
