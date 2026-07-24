@@ -352,13 +352,14 @@ export class ChatPage implements OnInit, OnDestroy {
       return;
     }
     const usuario = this.usuarioActual;
+    this.reenviandoTicket = true;
     this.agregarMensaje({ tipo: 'usuario-texto', texto: 'Reenviar código' });
 
     if (!(await this.requiereConexion())) {
+      this.reenviandoTicket = false;
       return;
     }
 
-    this.reenviandoTicket = true;
     this.mostrarEscribiendo();
     this.estudianteService.enviarTicketVerificacion(usuario.cedula).subscribe({
       next: async resultado => {
