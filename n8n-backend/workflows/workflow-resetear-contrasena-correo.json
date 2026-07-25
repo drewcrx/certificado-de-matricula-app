@@ -371,7 +371,7 @@
     },
     {
       "parameters": {
-        "fromEmail": "no-reply@yavirac.edu.ec",
+        "fromEmail": "mesadeayuda@yavirac.edu.ec",
         "toEmail": "={{ $('Buscar Estudiante (Postgres)').item.json.correoInstitucional }}",
         "subject": "Tu contraseña de correo institucional fue reseteada",
         "emailFormat": "text",

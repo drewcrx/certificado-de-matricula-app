@@ -98,12 +98,10 @@ Workflows → Import from File → seleccionar uno a uno desde `workflows/`:
 4. `workflow-generar-certificado.json`
 5. `workflow-enviar-certificado-pdf.json`
 6. `workflow-verificar-certificado.json` (público — la verificación por QR)
-7. `workflow-consultar-tickets.json`
-8. `workflow-crear-ticket-solicitud.json`
-9. `workflow-resetear-contrasena-correo.json`
-10. `workflow-consultar-laboratorios.json` (rol Docente)
-11. `workflow-reportar-incidencia-laboratorio.json` (rol Docente)
-12. `workflow-detectar-respuesta-ticket.json` (sin Webhook — ver nota abajo)
+7. `workflow-crear-ticket-solicitud.json`
+8. `workflow-resetear-contrasena-correo.json`
+9. `workflow-consultar-laboratorios.json` (rol Docente)
+10. `workflow-reportar-incidencia-laboratorio.json` (rol Docente)
 
 En cada workflow:
 - Abrir el nodo **Webhook** (el POST, no el OPTIONS) → sección Credentials →
@@ -114,15 +112,6 @@ En cada workflow:
 - En `workflow-consultar-estudiante.json`, el nodo "Verificar CAPTCHA (Google)"
   ya trae la Secret Key real embebida — no necesita credencial de n8n.
 - Activar el workflow con el toggle superior derecho, y darle **Publicar**
-
-**`workflow-detectar-respuesta-ticket.json` es distinto**: no tiene nodo
-Webhook (lo dispara un **Gmail Trigger**, sondeando la casilla
-`tramites@yavirac.edu.ec`), así que no lleva la credencial de API Key ni
-Postgres en un nodo Webhook — en su lugar necesita una credencial Gmail
-OAuth2 en el nodo del trigger. Si todavía no tienes esa credencial, puedes
-dejarlo sin activar; el resto de la app funciona igual, solo que el cierre
-automático de tickets por respuesta de correo no corre hasta que la
-configures.
 
 ---
 

@@ -502,7 +502,7 @@
     },
     {
       "parameters": {
-        "fromEmail": "tramites@yavirac.edu.ec",
+        "fromEmail": "mesadeayuda@yavirac.edu.ec",
         "toEmail": "={{ $json.correoResponsable }}",
         "subject": "=[{{ $('Generar Código (Postgres)').item.json.codigo }}] {{ $('Buscar Tipo de Trámite (Postgres)').item.json.nombre }}",
         "emailFormat": "text",
@@ -589,12 +589,12 @@
     },
     {
       "parameters": {
-        "fromEmail": "no-reply@yavirac.edu.ec",
+        "fromEmail": "mesadeayuda@yavirac.edu.ec",
         "toEmail": "={{ $('Buscar Estudiante (Postgres)').item.json.correoInstitucional }}",
         "subject": "=Confirmación de Solicitud — {{ $json.tipo }} | {{ $json.id }}",
         "emailFormat": "text",
         "options": {},
-        "text": "=🏫 INSTITUTO SUPERIOR TECNOLÓGICO \"YAVIRAC\"\n\n📋 Solicitud recibida\n\nEstimado/a estudiante,\n\nHemos recibido correctamente su solicitud de {{ $json.tipo }}.\n\n  • Número de ticket: {{ $json.id }}\n  • Tipo de trámite: {{ $json.tipo }}\n  • Estado actual: En proceso\n  • Fecha de solicitud: {{ $json.fechaSolicitud }}\n\nSu solicitud será procesada por el personal administrativo en un plazo de 3 a 5 días hábiles. Puede consultar el estado en cualquier momento desde la app, en \"Consultar estado de mis tickets\".\n\n📱 Enviado desde la app móvil · YaviBot\nInstituto Superior Tecnológico \"YAVIRAC\" · Quito, Ecuador\nwww.yavirac.edu.ec"
+        "text": "=🏫 INSTITUTO SUPERIOR TECNOLÓGICO \"YAVIRAC\"\n\n📋 Solicitud recibida\n\nEstimado/a estudiante,\n\nHemos recibido correctamente su solicitud de {{ $json.tipo }}.\n\n  • Número de ticket: {{ $json.id }}\n  • Tipo de trámite: {{ $json.tipo }}\n  • Estado actual: En proceso\n  • Fecha de solicitud: {{ $json.fechaSolicitud }}\n\nSu solicitud será procesada por el personal administrativo en un plazo de 3 a 5 días hábiles.\n\n📱 Enviado desde la app móvil · YaviBot\nInstituto Superior Tecnológico \"YAVIRAC\" · Quito, Ecuador\nwww.yavirac.edu.ec"
       },
       "id": "faaaaaa5-aaaa-4aaa-8aaa-aaaaaaaaaaa5",
       "name": "Enviar Confirmación por Correo",

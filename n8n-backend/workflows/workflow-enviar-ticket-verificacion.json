@@ -269,7 +269,7 @@
     },
     {
       "parameters": {
-        "fromEmail": "no-responder@yavirac.edu.ec",
+        "fromEmail": "mesadeayuda@yavirac.edu.ec",
         "toEmail": "={{ $('Generar Ticket').item.json.correoInstitucional }}",
         "subject": "Tu código de verificación - YaviBot",
         "emailFormat": "text",

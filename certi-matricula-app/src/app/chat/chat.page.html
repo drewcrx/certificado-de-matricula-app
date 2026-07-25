@@ -251,35 +251,6 @@
         </div>
       </div>
 
-      <div class="fila fila-bot" *ngIf="m.tipo === 'bot-tickets'">
-        <div class="avatar-mini">
-          <img src="assets/icon/yavibot-avatar.png" alt="YaviBot" />
-        </div>
-        <div class="tarjeta tarjeta-tickets">
-          <div class="franja-superior"></div>
-          <div class="encabezado-certificado">
-            <div class="insignia">
-              <ion-icon name="list-outline"></ion-icon>
-            </div>
-            <span class="titulo-certificado">Seguimiento de Tickets</span>
-          </div>
-          <div class="fila-ticket" *ngFor="let t of m.tickets">
-            <div class="fila-ticket-encabezado">
-              <span class="ticket-id">{{ t.id }}</span>
-              <span
-                class="ticket-estado"
-                [class.estado-completado]="t.estado === 'COMPLETADO'"
-                [class.estado-proceso]="t.estado === 'EN_PROCESO'"
-                [class.estado-rechazado]="t.estado === 'RECHAZADO'">
-                {{ t.estado === 'EN_PROCESO' ? 'En proceso' : (t.estado === 'COMPLETADO' ? 'Completado' : 'Rechazado') }}
-              </span>
-            </div>
-            <span class="ticket-tipo">{{ t.tipo }}</span>
-            <span class="ticket-fecha">{{ t.fechaSolicitud }}</span>
-          </div>
-        </div>
-      </div>
-
     </ng-container>
   </div>
 </ion-content>

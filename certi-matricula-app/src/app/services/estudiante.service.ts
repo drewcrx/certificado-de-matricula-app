@@ -166,26 +166,6 @@ export class EstudianteService {
   }
 
   /**
-   * Equivale al webhook de n8n que devuelve el historial de tickets
-   * (trámites) del estudiante, para la pantalla de "Consultar estado de mis
-   * tickets".
-   * Webhook real esperado: POST {n8nBaseUrl}/consultar-tickets  body: { cedula }
-   */
-  consultarTicketsSolicitud(cedula: string): Observable<TicketSolicitud[]> {
-    if (environment.usarMock) {
-      const tickets = this.obtenerOSembrarTickets(cedula);
-      // Más reciente primero.
-      const ordenados = [...tickets].sort((a, b) => (a.id < b.id ? 1 : -1));
-      return of(ordenados).pipe(delay(800));
-    }
-
-    return this.http.post<TicketSolicitud[]>(
-      `${environment.n8nBaseUrl}/consultar-tickets`,
-      { cedula }
-    );
-  }
-
-  /**
    * Equivale al webhook de n8n que genera el certificado de matrícula y
    * devuelve el código único (para el QR) que el sistema web validará
    * contra la base de datos.

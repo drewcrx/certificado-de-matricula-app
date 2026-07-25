@@ -32,7 +32,7 @@ datos.
 **Por eso la protección real contra "conozco la cédula de alguien y quiero
 actuar en su nombre" es la sesión OTP**, no la `X-Api-Key`: los endpoints que
 modifican datos o exponen información personal (`/generar-certificado-matricula`,
-`/enviar-certificado-pdf`, `/crear-ticket-solicitud`, `/consultar-tickets`,
+`/enviar-certificado-pdf`, `/crear-ticket-solicitud`,
 `/reportar-incidencia-laboratorio`, `/resetear-contrasena-correo`) exigen
 además un OTP verificado (`otp_codigos.usado = true`) en los últimos 20
 minutos para esa cédula — sin eso, responden `403`. `/consultar-estudiante`
@@ -268,6 +268,13 @@ Reglas importantes para el backend:
   `qr_codigos` y otra en `certificados` (ver `ESQUEMA-BD.md`) para que el
   sistema web pueda validar el QR contra la base de datos cuando alguien lo
   escanee.
+- **Reemisión (mismo estudiante, mismo periodo): se REFRESCA la fecha, no se
+  duplica el QR.** Si el estudiante ya tenía un certificado para el periodo
+  vigente y vuelve a pedirlo, el backend actualiza `certificados.fecha`/`hora`
+  a la fecha actual sobre la misma fila (mismo `qr_id` de siempre — el QR
+  nunca cambia, por el `UNIQUE` de la nota anterior). Así, tanto la respuesta
+  de este endpoint como el endpoint 4.2 (verificación por QR) siempre
+  muestran la fecha de la última vez que se generó/reenvió el certificado.
 - Si la cédula no existe, o el estudiante no tiene `estadoMatricula = "MATRICULADO"`,
   el backend responde con error (ver abajo) — la app no debería poder
   generar un certificado para alguien no matriculado.
@@ -285,9 +292,7 @@ Reglas importantes para el backend:
 - Este trámite es el único **100% automatizado** del menú (ver
   `ARQUITECTURA.md`). A diferencia de los demás trámites, **no crea una fila
   en `tickets`** — en el esquema real, `tipos_solicitud.genera_ticket = false`
-  para `CERT_MATRICULA`, así que el certificado de matrícula nunca aparece en
-  "Consultar estado de mis tickets" (endpoint 5); se rastrea únicamente vía
-  `certificados`/`qr_codigos`.
+  para `CERT_MATRICULA`; se rastrea únicamente vía `certificados`/`qr_codigos`.
 - **Este endpoint YA NO envía el correo al estudiante.** Solo crea el
   registro y devuelve los datos. El PDF real (con el membrete oficial) lo
   genera la app en el navegador con `certificado-pdf.service.ts`, y luego lo
@@ -374,7 +379,7 @@ Reglas importantes:
   certificado se comparte una vez (aparece en el propio QR), sin este
   chequeo cualquiera que hubiera visto un certificado ya emitido podía hacer
   que el sistema reenviara un PDF arbitrario al correo institucional del
-  estudiante, con remitente "oficial" (`no-reply@yavirac.edu.ec`).
+  estudiante, con remitente "oficial" (`mesadeayuda@yavirac.edu.ec`).
 - El PDF llega en base64 y se convierte a un adjunto binario real
   (`Attachments (File)` del nodo Send Email) — no es una imagen incrustada,
   es el archivo PDF completo generado por `certificado-pdf.service.ts`.
@@ -443,9 +448,12 @@ Reglas importantes:
 - **`nivel`, `carrera`, `modalidad` y `periodoActual` se leen EN VIVO** de
   `estudiantes`/`periodos_academicos` en el momento de la verificación, no
   de una copia congelada en `certificados` — si el estudiante avanza de
-  nivel, el QR sigue mostrando su situación actual. Solo `fechaEmision` y
-  `firmanteNombre`/`firmanteCargo` quedan congelados (son hechos propios de
-  ESE certificado: cuándo se emitió y quién lo firmó).
+  nivel, el QR sigue mostrando su situación actual. `fechaEmision` y
+  `firmanteNombre`/`firmanteCargo` sí quedan guardados en `certificados` (no
+  se recalculan en cada escaneo), pero `fechaEmision` **se refresca cuando
+  el estudiante reemite el certificado** (ver nota de "Reemisión" en el
+  endpoint 4) — el QR nunca cambia, pero la fecha mostrada siempre es la de
+  la última emisión.
 - Cada verificación exitosa incrementa `qr_codigos.verificaciones` — un
   contador de cuántas veces se validó ese certificado.
 - Un código inexistente o mal formado **siempre responde 404**, nunca un
@@ -454,72 +462,11 @@ Reglas importantes:
 
 ---
 
-## 5. Consultar estado de mis tickets
-
-Alimenta la pantalla "Consultar estado de mis tickets" del menú. Devuelve el
-historial de trámites **manuales** del estudiante (hoy solo Anulación de
-Matrícula) — el Certificado de Matrícula nunca aparece aquí, ver nota en el
-endpoint 4.
-
-**POST** `/consultar-tickets`
-
-### Request
-
-```json
-{
-  "cedula": "0102030405"
-}
-```
-
-### Response — 200 OK
-
-```json
-[
-  {
-    "id": "TK-000017",
-    "tipo": "Anulación de Matrícula",
-    "estado": "EN_PROCESO",
-    "fechaSolicitud": "10 de julio de 2026"
-  }
-]
-```
-
-`estado` que envía la app solo admite `"EN_PROCESO"` o `"COMPLETADO"` (no
-existe `"RECHAZADO"` en el esquema real). El workflow traduce los estados
-reales de la tabla `tickets` (`Pendiente`/`En Proceso` → `EN_PROCESO`,
-`Resuelto` → `COMPLETADO`). Si el estudiante no tiene tickets, responder
-`200` con `[]` (no `null`, no error). `id` es el `codigo` real del ticket
-(`TK-XXXXXX`), no un formato inventado.
-
-**Cómo llega un ticket a `COMPLETADO`**: automáticamente, sin panel
-administrativo ni intervención manual — ver "Workflows internos" más abajo
-(`detectar-respuesta-ticket`). Este endpoint no cambió en nada para
-soportarlo: simplemente lee `tickets.estado` en el momento de la consulta,
-así que refleja el cambio apenas ocurre, sin ningún ajuste de código.
-
-**Requiere sesión OTP reciente** (mismo chequeo que §4, 403 si no hay un
-`otp_codigos.usado = true` de los últimos 20 min para esa cédula) — sin
-esto, cualquiera con la cédula y la `X-Api-Key` podía leer el historial de
-trámites de otro estudiante saltándose el OTP.
-
----
-
-## Workflows internos (sin endpoint HTTP)
-
-No todos los workflows de n8n exponen un webhook — algunos se disparan por
-otro tipo de evento y no forman parte del "contrato" que llama la app
-directamente, pero sí modifican datos que la app luego lee.
-
-### `detectar-respuesta-ticket`
-
-Disparado por **Gmail Trigger** (no por la app) sobre la casilla
-`tramites@yavirac.edu.ec`: cuando Secretaría responde el correo de aviso de
-un ticket (identificado por `[TK-XXXXXX]` en el asunto, ver §6), y el
-remitente es un responsable autorizado para ese trámite, marca
-`tickets.estado = 'Resuelto'` y registra el evento `TicketResuelto`. Ver
-`PROPUESTA-CIERRE-AUTOMATICO-TICKETS.md` para el diseño completo. No
-requiere ningún cambio en la app — el efecto se ve la próxima vez que se
-llama a `/consultar-tickets` (endpoint 5).
+**Nota sobre la numeración**: el endpoint 5 (`/consultar-tickets`, historial
+de tickets del estudiante) y el workflow interno `detectar-respuesta-ticket`
+(cierre automático vía respuesta de Gmail) se eliminaron por indicación de
+la tutora — el seguimiento de tickets lo cubre el sistema web. Se deja el
+hueco en la numeración en vez de renumerar todo el documento.
 
 ---
 
@@ -702,14 +649,12 @@ n8n) como punto de partida:
 - `workflow-generar-certificado.json` — endpoint 4
 - `workflow-enviar-certificado-pdf.json` — endpoint 4.1
 - `workflow-verificar-certificado.json` — endpoint 4.2 (público, sin login — el QR)
-- `workflow-consultar-tickets.json` — endpoint 5
 - `workflow-crear-ticket-solicitud.json` — endpoint 6
 - `workflow-resetear-contrasena-correo.json` — endpoint 6.1
 - `workflow-consultar-laboratorios.json` — endpoint 8
 - `workflow-reportar-incidencia-laboratorio.json` — endpoint 9
-- `workflow-detectar-respuesta-ticket.json` — sin endpoint HTTP, disparado por Gmail Trigger (ver "Workflows internos" más arriba)
 
-Los 12 están escritos contra el **esquema real** de PostgreSQL (`ESQUEMA-BD.md`),
+Los 10 están escritos contra el **esquema real** de PostgreSQL (`ESQUEMA-BD.md`),
 no contra uno genérico — si la base de datos real termina siendo distinta a
 la de esta instancia (otro motor, otros nombres de columna), hay que ajustar
 las queries de cada nodo Postgres, pero el contrato de request/response hacia

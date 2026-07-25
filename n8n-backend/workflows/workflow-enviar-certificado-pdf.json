@@ -245,7 +245,7 @@
     },
     {
       "parameters": {
-        "fromEmail": "no-reply@yavirac.edu.ec",
+        "fromEmail": "mesadeayuda@yavirac.edu.ec",
         "toEmail": "={{ $json.correoInstitucional }}",
         "subject": "=Tu Certificado de Matrícula YAVIRAC — {{ $json.periodoActual }}",
         "emailFormat": "text",

@@ -618,11 +618,11 @@
     },
     {
       "parameters": {
-        "fromEmail": "no-reply@yavirac.edu.ec",
+        "fromEmail": "mesadeayuda@yavirac.edu.ec",
         "toEmail": "={{ $('Formatear Respuesta').item.json.correoResponsable }}",
         "subject": "=Nueva incidencia de laboratorio — {{ $('Formatear Respuesta').item.json.codigo }}",
         "emailFormat": "text",
-        "text": "=🔬 INSTITUTO SUPERIOR TECNOLÓGICO DE TURISMO Y PATRIMONIO \"YAVIRAC\"\n\n⚠️ Nueva incidencia de laboratorio\n\nEstimado/a {{ $('Formatear Respuesta').item.json.nombreResponsable }},\n\nEl/la docente {{ $('Formatear Respuesta').item.json.nombreDocente }} reportó una nueva incidencia:\n\nCódigo: {{ $('Formatear Respuesta').item.json.codigo }}\nLaboratorio: {{ $('Formatear Respuesta').item.json.laboratorio }}\nDescripción: {{ $('Formatear Respuesta').item.json.descripcion }}\nFecha: {{ $('Formatear Respuesta').item.json.fechaReporte }}\n\n📷 Se adjunta una foto de la incidencia.\n\nIngresa al panel administrativo para gestionar esta incidencia.\n\n📱 Enviado desde la app móvil · YaviBot\nInstituto Superior Tecnológico de Turismo y Patrimonio \"YAVIRAC\" · Quito, Ecuador\nwww.yavirac.edu.ec",
+        "text": "=🔬 INSTITUTO SUPERIOR TECNOLÓGICO DE TURISMO Y PATRIMONIO \"YAVIRAC\"\n\n⚠️ Nueva incidencia de laboratorio\n\nEstimado/a {{ $('Formatear Respuesta').item.json.nombreResponsable }},\n\nEl/la docente {{ $('Formatear Respuesta').item.json.nombreDocente }} reportó una nueva incidencia:\n\nCódigo: {{ $('Formatear Respuesta').item.json.codigo }}\nLaboratorio: {{ $('Formatear Respuesta').item.json.laboratorio }}\nDescripción: {{ $('Formatear Respuesta').item.json.descripcion }}\nFecha: {{ $('Formatear Respuesta').item.json.fechaReporte }}\n\n📷 Se adjunta una foto de la incidencia.\n\n📱 Enviado desde la app móvil · YaviBot\nInstituto Superior Tecnológico de Turismo y Patrimonio \"YAVIRAC\" · Quito, Ecuador\nwww.yavirac.edu.ec",
         "options": {
           "fileAttachments": "foto"
         }
@@ -646,11 +646,11 @@
     },
     {
       "parameters": {
-        "fromEmail": "no-reply@yavirac.edu.ec",
+        "fromEmail": "mesadeayuda@yavirac.edu.ec",
         "toEmail": "={{ $json.correoResponsable }}",
         "subject": "=Nueva incidencia de laboratorio — {{ $json.codigo }}",
         "emailFormat": "text",
-        "text": "=🔬 INSTITUTO SUPERIOR TECNOLÓGICO DE TURISMO Y PATRIMONIO \"YAVIRAC\"\n\n⚠️ Nueva incidencia de laboratorio\n\nEstimado/a {{ $json.nombreResponsable }},\n\nEl/la docente {{ $json.nombreDocente }} reportó una nueva incidencia:\n\nCódigo: {{ $json.codigo }}\nLaboratorio: {{ $json.laboratorio }}\nDescripción: {{ $json.descripcion }}\nFecha: {{ $json.fechaReporte }}\n\nIngresa al panel administrativo para gestionar esta incidencia.\n\n📱 Enviado desde la app móvil · YaviBot\nInstituto Superior Tecnológico de Turismo y Patrimonio \"YAVIRAC\" · Quito, Ecuador\nwww.yavirac.edu.ec",
+        "text": "=🔬 INSTITUTO SUPERIOR TECNOLÓGICO DE TURISMO Y PATRIMONIO \"YAVIRAC\"\n\n⚠️ Nueva incidencia de laboratorio\n\nEstimado/a {{ $json.nombreResponsable }},\n\nEl/la docente {{ $json.nombreDocente }} reportó una nueva incidencia:\n\nCódigo: {{ $json.codigo }}\nLaboratorio: {{ $json.laboratorio }}\nDescripción: {{ $json.descripcion }}\nFecha: {{ $json.fechaReporte }}\n\n📱 Enviado desde la app móvil · YaviBot\nInstituto Superior Tecnológico de Turismo y Patrimonio \"YAVIRAC\" · Quito, Ecuador\nwww.yavirac.edu.ec",
         "options": {}
       },
       "id": "idddddd3-dddd-4ddd-8ddd-ddddddddddd3",

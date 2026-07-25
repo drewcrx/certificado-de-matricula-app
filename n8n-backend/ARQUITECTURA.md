@@ -55,20 +55,21 @@ workflows/
   workflow-consultar-estudiante.json           # dominio: identidad (estudiante o docente)
   workflow-enviar-ticket-verificacion.json     # dominio: verificación (OTP)
   workflow-verificar-ticket.json               # dominio: verificación (OTP)
-  workflow-consultar-tickets.json              # dominio: trámites/tickets (estudiante)
   workflow-crear-ticket-solicitud.json         # dominio: trámites/tickets (genérico, estudiante)
   workflow-generar-certificado.json            # dominio: trámites/tickets (especializado, estudiante)
   workflow-enviar-certificado-pdf.json         # dominio: trámites/tickets (adjunto PDF por correo)
   workflow-verificar-certificado.json          # dominio: trámites/tickets (público, sin login — QR = firma)
   workflow-resetear-contrasena-correo.json     # dominio: trámites (especializado, automático, estudiante)
-  workflow-detectar-respuesta-ticket.json      # dominio: trámites/tickets (sin webhook — Gmail Trigger)
   workflow-consultar-laboratorios.json         # dominio: rol Docente (catálogo)
   workflow-reportar-incidencia-laboratorio.json # dominio: rol Docente (incidencia + foto opcional)
 ```
 
-`workflow-detectar-respuesta-ticket.json` es el único que **no** tiene un
-nodo Webhook — lo dispara Gmail Trigger, no la app. Ver "Cierre automático
-de tickets" más abajo.
+**Nota**: el seguimiento/actualización de estado de tickets
+(`consultar-tickets` y el cierre automático vía respuesta de Gmail,
+`detectar-respuesta-ticket`) se implementó y luego se eliminó por
+indicación de la tutora — ese trámite lo cubre el sistema web, para no
+duplicar funcionalidad entre los dos grupos. Ver "Roadmap de fases" (Fase
+1 y Fase 7) para el detalle histórico.
 
 Cada dominio se agrupa por prefijo de nombre. Cuando el proyecto crezca (más
 trámites, más integraciones), los workflows nuevos se agregan siguiendo el
@@ -102,10 +103,8 @@ envelope `{success, data}`) por consistencia con lo ya construido:
 
 ## Seguridad
 
-- **Autenticación del webhook — ✅ implementado.** Los 11 workflows con
-  Webhook (todos menos `workflow-detectar-respuesta-ticket.json`, que se
-  dispara por Gmail Trigger) usan Header Auth (`X-Api-Key`) como credencial
-  del propio nodo
+- **Autenticación del webhook — ✅ implementado.** Los 10 workflows con
+  Webhook usan Header Auth (`X-Api-Key`) como credencial del propio nodo
   Webhook — sin el header correcto, n8n responde 403 antes de ejecutar
   cualquier lógica. La app la agrega automáticamente vía
   `ApiKeyInterceptor` (`certi-matricula-app/src/app/interceptors/`), que
@@ -127,8 +126,8 @@ envelope `{success, data}`) por consistencia con lo ya construido:
   llamando, solo "algo que pasa por la app". Por eso los endpoints que
   actúan en nombre de un estudiante/docente específico
   (`generar-certificado-matricula`, `enviar-certificado-pdf`,
-  `crear-ticket-solicitud`, `consultar-tickets`,
-  `reportar-incidencia-laboratorio`) exigen además un OTP verificado
+  `crear-ticket-solicitud`, `reportar-incidencia-laboratorio`) exigen
+  además un OTP verificado
   (`otp_codigos.usado = true`, últimos 20 min) para esa cédula — mismo
   patrón que ya traía `resetear-contrasena-correo` desde su diseño
   original. Sin la sesión OTP responden 403; la app detecta ese 403 y
@@ -279,38 +278,6 @@ está en `PROPUESTA-RESET-CORREO-AUTOMATICO.md` — resumen:
 
 ---
 
-## Cierre automático de tickets (respuesta de Gmail)
-
-Los tickets (hoy solo Anulación de Matrícula) nunca pasaban de
-`EN_PROCESO` a `COMPLETADO` — no existía ningún mecanismo real que
-disparara ese cambio. Diseño completo en
-`PROPUESTA-CIERRE-AUTOMATICO-TICKETS.md`; resumen:
-
-- El correo de aviso a Secretaría (`workflow-crear-ticket-solicitud.json`)
-  ahora sale de una casilla real monitoreada (`tramites@yavirac.edu.ec`,
-  **placeholder** — TI debe confirmar/crear la real), no de un
-  `no-reply@` que nadie lee, y el asunto lleva el código al frente:
-  `[TK-XXXXXX] ...`.
-- `workflow-detectar-respuesta-ticket.json`: **Gmail Trigger** (no
-  webhook) sobre esa casilla. Cuando Secretaría responde el correo
-  original, extrae `TK-XXXXXX` del asunto, valida que el remitente
-  comparte el rol del responsable asignado (mismo patrón que los avisos a
-  dos personas de Anulación/Certificados) y marca `tickets.estado =
-  'Resuelto'`.
-- **Cero cambios en la app**: `/consultar-tickets` ya traducía `Resuelto →
-  COMPLETADO` desde que se construyó ese endpoint — simplemente nunca
-  había nada que produjera ese estado. Verificado con una prueba real
-  (`TK-000007` pasó a `COMPLETADO` en la respuesta del endpoint tras
-  simular la actualización).
-- El polling del Gmail Trigger (cada minuto) **no es un cron que cambie
-  estados por tiempo** — solo actúa si encuentra un correo real; el
-  disparador sigue siendo el evento, no el reloj.
-- Pendiente: credencial de Gmail en n8n (OAuth2/Service Account con acceso
-  de lectura únicamente a `tramites@yavirac.edu.ec`) y confirmar que esa
-  casilla existe/recibe correo de verdad.
-
----
-
 ## Rol Docente
 
 Segunda identidad de usuario, agregada sin tocar el flujo de identificación
@@ -376,8 +343,9 @@ incidente. Diseño:
 ## Roadmap de fases
 
 1. **Fase 1 (hecha)**: consultar-estudiante, enviar/verificar-ticket,
-   generar-certificado-matricula, consultar-tickets, crear-ticket-solicitud
-   para Anulación de Matrícula. Esquema temporal de base de datos (ya
+   generar-certificado-matricula, crear-ticket-solicitud para Anulación de
+   Matrícula (esta fase también incluyó `consultar-tickets`, eliminado
+   después — ver Fase 7). Esquema temporal de base de datos (ya
    reemplazado, ver fase 3).
 2. **Fase 2 (hecha)**: backend real corriendo en Docker local (n8n +
    PostgreSQL, `docker-compose.yml`/`init.sql`/`ARRANQUE-LOCAL.md`). En la
@@ -399,12 +367,12 @@ incidente. Diseño:
    auditoría y aviso a los encargados de certificados (ver "Reseteo de
    contraseña: automático, no un ticket" arriba). Falta que TI del
    instituto entregue la credencial real de Google Workspace.
-7. **Fase 7 (hecha, pendiente credencial real)**: cierre automático de
-   tickets vía respuesta de Gmail — `detectar-respuesta-ticket`, validado
-   con pruebas reales de SQL (marca `COMPLETADO`, idempotencia, remitente
-   no autorizado correctamente ignorado). Falta la credencial de Gmail y
-   confirmar la casilla real `tramites@yavirac.edu.ec` (ver "Cierre
-   automático de tickets" arriba).
+7. **Fase 7 (revertida)**: se había construido el cierre automático de
+   tickets vía respuesta de Gmail (`detectar-respuesta-ticket`) y el
+   endpoint `consultar-tickets` para que el estudiante viera el estado de
+   sus trámites. Ambos se **eliminaron** por indicación de la tutora: el
+   seguimiento de tickets lo cubre el sistema web, y mantenerlo en esta app
+   habría duplicado funcionalidad entre los dos grupos.
 8. **Fase 8 (hecha)**: verificación pública de certificado por QR
    (`verificar-certificado` — el QR funciona como firma de Secretaría),
    CAPTCHA en el ingreso de cédula, sesión OTP verificada server-side en

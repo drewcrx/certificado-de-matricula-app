@@ -15,7 +15,6 @@ import {
   IncidenciaLaboratorio,
   Laboratorio,
   OpcionChat,
-  TicketSolicitud,
   Usuario
 } from '../models/estudiante.model';
 
@@ -36,7 +35,6 @@ type TipoMensaje =
   | 'bot-opciones'
   | 'bot-preview-certificado'
   | 'bot-resultado-certificado'
-  | 'bot-tickets'
   | 'bot-confirmacion-anulacion'
   | 'bot-confirmacion-reseteo'
   | 'bot-laboratorios'
@@ -49,7 +47,6 @@ interface ChatMensaje {
   estudiante?: Estudiante;
   certificado?: CertificadoMatricula;
   qrDataUrl?: string;
-  tickets?: TicketSolicitud[];
   laboratorios?: Laboratorio[];
   laboratorioSeleccionado?: Laboratorio;
   descripcionIncidencia?: string;
@@ -66,7 +63,6 @@ type EstadoConversacion =
   | 'menu'
   | 'preview_certificado'
   | 'generando_certificado'
-  | 'consultando_tickets'
   | 'confirmando_anulacion'
   | 'procesando_anulacion'
   | 'confirmando_reseteo_correo'
@@ -82,7 +78,6 @@ const OPCIONES_MENU_ESTUDIANTE: OpcionChat[] = [
   { id: 'CERTIFICADO_MATRICULA', etiqueta: 'Solicitar Certificado de Matrícula', icono: 'document-text-outline', disponible: true },
   { id: 'ANULACION_MATRICULA', etiqueta: 'Solicitar Anulación de Matrícula', icono: 'close-circle-outline', disponible: true },
   { id: 'RESET_CORREO', etiqueta: 'Resetear contraseña de correo institucional', icono: 'key-outline', disponible: true },
-  { id: 'ESTADO_TICKETS', etiqueta: 'Consultar estado de mis tickets', icono: 'list-outline', disponible: true },
   { id: 'FINALIZAR_CONVERSACION', etiqueta: 'Finalizar conversación', icono: 'exit-outline', disponible: true }
 ];
 
@@ -414,11 +409,6 @@ export class ChatPage implements OnInit, OnDestroy {
       return;
     }
 
-    if (opcion.id === 'ESTADO_TICKETS' && this.esEstudiante(usuario)) {
-      await this.consultarEstadoTickets(usuario);
-      return;
-    }
-
     if (opcion.id === 'REPORTAR_INCIDENCIA_LAB') {
       await this.iniciarReporteIncidencia();
       return;
@@ -475,7 +465,7 @@ export class ChatPage implements OnInit, OnDestroy {
           `(${this.usuarioActual?.correoInstitucional}). ` +
           `El personal de Secretaría procesará tu solicitud en un plazo de 3 a 5 días hábiles.`
         );
-        await this.hablar('Puedes consultar el estado de tu solicitud en cualquier momento desde "Consultar estado de mis tickets". ¿Deseas hacer algo más?');
+        await this.hablar('¿Deseas hacer algo más?');
         this.agregarMensaje({ tipo: 'bot-opciones' });
         this.estado = 'menu';
       },
@@ -556,40 +546,6 @@ export class ChatPage implements OnInit, OnDestroy {
     await this.hablar('Solicitud cancelada. ¿En qué más puedo ayudarte?');
     this.agregarMensaje({ tipo: 'bot-opciones' });
     this.estado = 'menu';
-  }
-
-  private async consultarEstadoTickets(estudiante: Estudiante): Promise<void> {
-    this.estado = 'consultando_tickets';
-
-    if (!(await this.requiereConexion())) {
-      this.estado = 'menu';
-      return;
-    }
-
-    this.mostrarEscribiendo();
-    this.estudianteService.consultarTicketsSolicitud(estudiante.cedula).subscribe({
-      next: async tickets => {
-        this.quitarEscribiendo();
-        if (tickets.length === 0) {
-          await this.hablar('No tienes tickets registrados todavía.');
-        } else {
-          await this.hablar('Este es el seguimiento de tus tickets:');
-          this.agregarMensaje({ tipo: 'bot-tickets', tickets });
-        }
-        this.agregarMensaje({ tipo: 'bot-opciones' });
-        this.estado = 'menu';
-      },
-      error: async (error: HttpErrorResponse) => {
-        this.quitarEscribiendo();
-        if (error.status === 403) {
-          await this.manejarSesionExpirada();
-          return;
-        }
-        await this.hablar('No pude consultar tus tickets en este momento. Intenta nuevamente en unos segundos.');
-        this.agregarMensaje({ tipo: 'bot-opciones' });
-        this.estado = 'menu';
-      }
-    });
   }
 
   private async finalizarConversacion(): Promise<void> {

@@ -82,9 +82,7 @@ Estas son las razones concretas por las que las pruebas fallaban:
 9. **`tipos_solicitud.genera_ticket = false` para `CERT_MATRICULA`.** Es
    decir, el propio esquema real ya dice que el certificado de matrícula
    **no genera una fila en `tickets`** — se rastrea únicamente vía
-   `certificados` + `qr_codigos`. Por eso "Consultar estado de mis tickets"
-   en la app solo debe mostrar trámites manuales (Anulación de Matrícula),
-   nunca certificados de matrícula.
+   `certificados` + `qr_codigos`.
 10. **Los estados de `tickets` están en español y son distintos**:
     `Pendiente | En Proceso | Resuelto` (no existe un estado "rechazado").
     Los workflows traducen esto a `EN_PROCESO | COMPLETADO` para no romper

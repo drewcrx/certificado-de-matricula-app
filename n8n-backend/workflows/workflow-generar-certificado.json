@@ -234,13 +234,13 @@
       "parameters": {
         "operation": "executeQuery",
         "resource": "database",
-        "query": "SELECT qc.identificador AS \"codigoUnico\", cert.fecha FROM certificados cert JOIN qr_codigos qc ON qc.id = cert.qr_id WHERE cert.estudiante_id = $1 AND cert.periodo_lectivo_codigo = $2 ORDER BY cert.creado_en DESC LIMIT 1",
+        "query": "UPDATE certificados cert SET fecha = (NOW() AT TIME ZONE 'America/Guayaquil')::date, hora = (NOW() AT TIME ZONE 'America/Guayaquil')::time FROM qr_codigos qc WHERE qc.id = cert.qr_id AND cert.estudiante_id = $1 AND cert.periodo_lectivo_codigo = $2 RETURNING qc.identificador AS \"codigoUnico\", cert.fecha",
         "options": {
           "queryReplacement": "={{ [$('Buscar Estudiante (Postgres)').item.json.estudiante_id, $('Buscar Estudiante (Postgres)').item.json.periodo_codigo] }}"
         }
       },
       "id": "b9999999-9999-4999-8999-999999999999",
-      "name": "Buscar Certificado Existente (Postgres)",
+      "name": "Actualizar Certificado Existente (Postgres)",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
@@ -248,6 +248,7 @@
         -220
       ],
       "alwaysOutputData": true,
+      "notes": "Si ya existe un certificado para este estudiante+periodo, se REFRESCA su fecha/hora a la actual en vez de solo leerlo — así, al reimprimir/reenviar, tanto la app como la verificación por QR muestran la fecha de esta última generación, sin crear un QR nuevo (mismo qr_id de siempre). Si no existe ninguno, el UPDATE no afecta filas y (por alwaysOutputData) el nodo emite un item vacío, que la condición siguiente interpreta como 'no existe' y sigue al flujo de creación.",
       "credentials": {
         "postgres": {
           "id": "REEMPLAZAR",
@@ -468,7 +469,7 @@
     },
     {
       "parameters": {
-        "fromEmail": "no-reply@yavirac.edu.ec",
+        "fromEmail": "mesadeayuda@yavirac.edu.ec",
         "toEmail": "={{ $json.correos }}",
         "subject": "=Nuevo Certificado de Matrícula emitido — {{ $('Formatear Respuesta').item.json.cedula }}",
         "emailFormat": "text",
@@ -585,7 +586,7 @@
       "main": [
         [
           {
-            "node": "Buscar Certificado Existente (Postgres)",
+            "node": "Actualizar Certificado Existente (Postgres)",
             "type": "main",
             "index": 0
           }
@@ -599,7 +600,7 @@
         ]
       ]
     },
-    "Buscar Certificado Existente (Postgres)": {
+    "Actualizar Certificado Existente (Postgres)": {
       "main": [
         [
           {

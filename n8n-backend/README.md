@@ -18,9 +18,9 @@ y el checklist de despliegue. Este README es solo el índice de archivos.
   trámites automáticos vs. manuales, checklist de despliegue en producción.
 - **`ESQUEMA-BD.md`** — esquema **real** de PostgreSQL (dump compartido por
   el instituto, no uno temporal/inventado).
-- **`CONTRATO-API.md`** — especificación completa de los 11 endpoints HTTP
+- **`CONTRATO-API.md`** — especificación completa de los 10 endpoints HTTP
   (request/response exactos, reglas de negocio, respuestas de error).
-- **`workflows/`** — los 12 workflows de n8n importables:
+- **`workflows/`** — los 10 workflows de n8n importables:
 
   | Workflow | Endpoint | Rol |
   |---|---|---|
@@ -30,23 +30,26 @@ y el checklist de despliegue. Este README es solo el índice de archivos.
   | `workflow-generar-certificado.json` | 4 | Único trámite 100% automático (certificado + QR) |
   | `workflow-enviar-certificado-pdf.json` | 4.1 | Adjunta y envía el PDF real (generado en la app) |
   | `workflow-verificar-certificado.json` | 4.2 | **Público**, sin login — el QR como firma de Secretaría |
-  | `workflow-consultar-tickets.json` | 5 | Historial de trámites manuales del estudiante |
   | `workflow-crear-ticket-solicitud.json` | 6 | Genérico — hoy solo Anulación de Matrícula |
   | `workflow-resetear-contrasena-correo.json` | 6.1 | Reseteo automático (Google Workspace) |
   | `workflow-consultar-laboratorios.json` | 8 | Catálogo para el rol Docente |
   | `workflow-reportar-incidencia-laboratorio.json` | 9 | Reporte de incidencia (rol Docente, foto opcional) |
-  | `workflow-detectar-respuesta-ticket.json` | — | Sin webhook: Gmail Trigger, cierra tickets solos |
 
   Los endpoints que actúan en nombre de un estudiante/docente específico (4,
-  4.1, 5, 6, 9) exigen una sesión OTP verificada en los últimos 20 min —
+  4.1, 6, 9) exigen una sesión OTP verificada en los últimos 20 min —
   ver "Autenticación" en `CONTRATO-API.md`.
+
+  **Nota**: el seguimiento de tickets (`consultar-tickets`, endpoint 5) y el
+  cierre automático vía respuesta de Gmail (`detectar-respuesta-ticket`) se
+  eliminaron por indicación de la tutora — ese trámite lo cubre el sistema
+  web, para no duplicar funcionalidad entre los dos grupos.
 
 ## Cómo importar en n8n
 
 1. Tener las tablas de `ESQUEMA-BD.md` creadas en tu instancia de PostgreSQL
    (local con Docker para desarrollo, o la base real del instituto).
 2. Abrir n8n → `Workflows` → `Import from File` (o arrastrar cada `.json`)
-   para los 12 archivos de `workflows/`.
+   para los 10 archivos de `workflows/`.
 3. En cada nodo Postgres, configurar la credencial real ("Yavirac DB" o
    como se llame en tu instancia) — todos los nodos vienen con el
    placeholder `REEMPLAZAR`.
@@ -60,10 +63,7 @@ y el checklist de despliegue. Este README es solo el índice de archivos.
 7. En `workflow-resetear-contrasena-correo.json`, configurar la credencial
    de Service Account de Google Workspace (Domain-Wide Delegation) cuando
    esté disponible.
-8. En `workflow-detectar-respuesta-ticket.json`, configurar la credencial
-   Gmail OAuth2 de la casilla `tramites@yavirac.edu.ec` cuando esté
-   disponible.
-9. Activar los 12 workflows y confirmar que la URL base coincide con
+8. Activar los 10 workflows y confirmar que la URL base coincide con
    `environment.n8nBaseUrl` de la app (`http://localhost:5678/webhook` en
    desarrollo).
 

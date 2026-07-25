@@ -418,19 +418,9 @@
     border-radius: 10px;
     white-space: nowrap;
 
-    &.estado-completado {
-      background: #e1f6ea;
-      color: #1c8a4d;
-    }
-
     &.estado-proceso {
       background: #fff3e0;
       color: #b3690b;
-    }
-
-    &.estado-rechazado {
-      background: #fde8e8;
-      color: #c62a2a;
     }
   }
 
