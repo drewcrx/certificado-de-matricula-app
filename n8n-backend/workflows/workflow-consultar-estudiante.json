@@ -3,7 +3,7 @@
   "nodes": [
     {
       "parameters": {
-        "content": "## Consultar estudiante o docente por cédula (esquema REAL)\n- Primero busca en `estudiantes`. Si no hay match, busca en `docentes` (segunda identidad, misma cédula/OTP).\n- La respuesta incluye `tipoUsuario: 'ESTUDIANTE' | 'DOCENTE'` — la app usa este campo para decidir qué menú mostrar (el flujo de cédula+OTP es idéntico para ambos, no hay pantalla de login separada).\n- estudiantes.correo (no correo_institucional). estudiantes.nombres trae el nombre completo; no hay columna apellidos separada, se devuelve '' para no romper el contrato.\n- carrera se obtiene por JOIN a carreras (carrera_id). periodoActual viene de periodos_academicos WHERE vigente = true.\n- Los docentes no tienen carrera/nivel/periodo/estadoMatricula — esos campos van null en su respuesta.\n- Query parametrizada ($1) — NUNCA concatenar el input del usuario en el SQL.\n- Incluye manejo de preflight CORS (OPTIONS) para que el navegador no bloquee el POST real.\n- CAPTCHA (reCAPTCHA v2, agregado 2026-07-22): este es el único punto de\n  entrada sin OTP previo (aquí se consulta si la cédula existe), así que es\n  el más expuesto a fuerza bruta/enumeración — se verifica el token contra\n  la API de Google (siteverify) ANTES de tocar la BD. Si falla, 403 y no se\n  llega a consultar estudiantes/docentes. onError=continueRegularOutput en\n  el HTTP Request: si Google no responde, el output no trae `success`, el\n  IF de abajo lo evalúa como inválido — falla cerrado, no abierto.\n- Secret Key real de la clave \"YaviBot Chat\" (google.com/recaptcha/admin),\n  autorizada hoy para los dominios localhost y 192.168.1.11 — antes de\n  desplegar al VPS, agregar ahí el dominio real del instituto (misma clave,\n  no hace falta regenerarla). Su Site Key pareja vive en environment.ts.",
+        "content": "## Consultar estudiante o docente por cédula (esquema REAL)\n- Primero busca en `estudiantes`. Si no hay match, busca en `docentes` (segunda identidad, misma cédula/OTP).\n- La respuesta incluye `tipoUsuario: 'ESTUDIANTE' | 'DOCENTE'` — la app usa este campo para decidir qué menú mostrar (el flujo de cédula+OTP es idéntico para ambos, no hay pantalla de login separada).\n- estudiantes.correo (no correo_institucional). estudiantes.nombres trae el nombre completo; no hay columna apellidos separada, se devuelve '' para no romper el contrato.\n- carrera se obtiene por JOIN a carreras (carrera_id). periodoActual viene de periodos_academicos WHERE vigente = true.\n- Los docentes no tienen carrera/nivel/periodo/estadoMatricula — esos campos van null en su respuesta.\n- Query parametrizada ($1) — NUNCA concatenar el input del usuario en el SQL.\n- Incluye manejo de preflight CORS (OPTIONS) para que el navegador no bloquee el POST real.\n- CAPTCHA (reCAPTCHA v2, agregado 2026-07-22): este es el único punto de\n  entrada sin OTP previo (aquí se consulta si la cédula existe), así que es\n  el más expuesto a fuerza bruta/enumeración — se verifica el token contra\n  la API de Google (siteverify) ANTES de tocar la BD. Si falla, 403 y no se\n  llega a consultar estudiantes/docentes. onError=continueRegularOutput en\n  el HTTP Request: si Google no responde, el output no trae `success`, el\n  IF de abajo lo evalúa como inválido — falla cerrado, no abierto.\n- Secret Key real de la clave \"YaviBot Chat\" (google.com/recaptcha/admin,\n  cuenta mesadeayuda@yavirac.edu.ec), autorizada hoy para el dominio\n  localhost — antes de desplegar al VPS, agregar ahí el dominio real del\n  instituto (misma clave, no hace falta regenerarla). Su Site Key pareja\n  vive en environment.ts.",
         "height": 420,
         "width": 380
       },
@@ -100,7 +100,7 @@
           "parameters": [
             {
               "name": "secret",
-              "value": "6Ld3V2AtAAAAAO4iLeDFFxf8z_HGRsojXaDkh50j"
+              "value": "6LeuMWUtAAAAALpzJOkqZ365aYqFy8Zkc0X31vxF"
             },
             {
               "name": "response",
@@ -119,7 +119,7 @@
         300,
         -260
       ],
-      "notes": "Secret Key real de la clave \"YaviBot Chat\" en google.com/recaptcha/admin (dominios autorizados: localhost, 192.168.1.11). Agregar el dominio real del instituto ahí antes de producción."
+      "notes": "Secret Key real de la clave \"YaviBot Chat\" en google.com/recaptcha/admin, registrada con la cuenta mesadeayuda@yavirac.edu.ec (dominio autorizado: localhost). Agregar el dominio real del instituto ahí antes de producción."
     },
     {
       "parameters": {
